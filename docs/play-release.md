@@ -274,6 +274,13 @@ discards the edit. It never commits, uploads binaries, submits for review or
 publishes. A successful validation is not policy approval. This follows Google's
 [transactional edits model](https://developers.google.com/android-publisher/edits).
 
+The first API check confirmed missing English short/full descriptions and rejected
+the production candidate with `HTTP 400: Precondition check failed`. Use
+`operation=listing` to save only missing descriptions from
+[`en-US.json`](../release/play-listing/en-US.json). Existing owner-written fields
+are preserved, and release tracks are not changed. Preflight also reports icon,
+feature graphic, TV banner and TV screenshot counts.
+
 Successful compilation is not a claim of Play approval. Before a public rollout,
 complete the privacy policy, Data safety and permission declarations, listing
 assets, TV distribution setup, and signing-key backup. Resolve the existing phone

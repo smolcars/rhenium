@@ -163,7 +163,12 @@ export async function preflight(api, config) {
       throw new Error('The release bundles are not already uploaded; preflight never uploads new binaries.');
     }
     const listings = (await api.json(`${editUrl}/listings`)).listings ?? [];
+    const imageCounts = {};
+    for (const type of ['icon', 'featureGraphic', 'tvBanner', 'tvScreenshots']) {
+      imageCounts[type] = ((await api.json(`${editUrl}/listings/en-US/${type}`)).images ?? []).length;
+    }
     console.log(JSON.stringify({ packageName: config.packageName, track: track.track, versionCodes: codes,
+      imageCounts,
       storeListings: listings.map(item => ({ language: item.language, titlePresent: Boolean(item.title),
         shortDescriptionPresent: Boolean(item.shortDescription), fullDescriptionPresent: Boolean(item.fullDescription) })) }, null, 2));
     // This status exists only inside the temporary edit. Never call commit here.
@@ -178,6 +183,37 @@ export async function preflight(api, config) {
     const discarded = await api.request(editUrl, { method: 'DELETE' });
     if (!discarded.ok && discarded.status !== 404) throw new Error(`Preflight edit cleanup failed (HTTP ${discarded.status}).`);
     console.log('Preflight edit discarded; no release was published or submitted for review.');
+  }
+}
+
+export async function prepareListing(api, config) {
+  const content = JSON.parse(readFileSync(new URL('../release/play-listing/en-US.json', import.meta.url), 'utf8'));
+  if (typeof content.shortDescription !== 'string' || !content.shortDescription.length || content.shortDescription.length > 80 ||
+      typeof content.fullDescription !== 'string' || !content.fullDescription.length || content.fullDescription.length > 4000) {
+    throw new Error('Store descriptions exceed Google Play limits or are missing.');
+  }
+  const base = `${API}${encodeURIComponent(config.packageName)}/edits`;
+  const edit = await api.json(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  if (!edit.id) throw new Error('Play returned no edit ID.');
+  const editUrl = `${base}/${encodeURIComponent(edit.id)}`;
+  let committed = false;
+  try {
+    const current = await api.json(`${editUrl}/listings/en-US`);
+    const missing = Object.fromEntries(Object.entries(content).filter(([key]) => !current[key]));
+    if (!Object.keys(missing).length) {
+      console.log('Store descriptions already exist; preserved without changes.');
+      return;
+    }
+    await api.json(`${editUrl}/listings/en-US`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(missing) });
+    await api.json(`${editUrl}:validate`, { method: 'POST' });
+    await api.json(`${editUrl}:commit?changesInReviewBehavior=ERROR_IF_IN_REVIEW`, { method: 'POST' });
+    committed = true;
+    console.log('Saved missing store descriptions; no release tracks changed.');
+  } finally {
+    if (!committed) {
+      const discarded = await api.request(editUrl, { method: 'DELETE' });
+      if (!discarded.ok && discarded.status !== 404) throw new Error(`Listing edit cleanup failed (HTTP ${discarded.status}).`);
+    }
   }
 }
 
@@ -217,8 +253,8 @@ async function download(api, config, directory) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const [operation, directory] = process.argv.slice(2);
-    if (!['stage', 'download', 'preflight'].includes(operation) || (operation !== 'preflight' && !directory)) {
-      throw new Error('Usage: publish_play_release.mjs stage|download DIRECTORY, or preflight');
+    if (!['stage', 'download', 'preflight', 'listing'].includes(operation) || (['stage', 'download'].includes(operation) && !directory)) {
+      throw new Error('Usage: publish_play_release.mjs stage|download DIRECTORY, preflight, or listing');
     }
     let credentials;
     try { credentials = JSON.parse(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON ?? '{}'); }
@@ -226,7 +262,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     delete process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
     const config = JSON.parse(readFileSync(new URL('../release/android.json', import.meta.url), 'utf8'));
     const api = client(await authenticate(credentials));
-    await ({ stage, download, preflight }[operation])(api, config, directory);
+    await ({ stage, download, preflight, listing: prepareListing }[operation])(api, config, directory);
   } catch (error) {
     console.error(error instanceof Error ? error.message : 'Play operation failed.');
     process.exitCode = 1;
