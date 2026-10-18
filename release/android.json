@@ -2,7 +2,8 @@
   "packageName": "com.nitesh.rhenium",
   "versionName": "0.1.0",
   "versionCodes": {
-    "arm": 1001,
-    "arm64": 1002
-  }
+    "arm": 1003,
+    "arm64": 1004
+  },
+  "replacesDraftVersionCodes": [1001, 1002]
 }

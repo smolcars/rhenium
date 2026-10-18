@@ -93,6 +93,24 @@ test('GitHub APKs require an unambiguous common Play signing identity', () => {
   assert.throws(() => selectUniversalApks([{ generatedApks: [{ certificateSha256Hash: 'a'.repeat(64) }] }, { generatedApks: [second] }]), /unambiguous/);
 });
 
+test('a replacement candidate can supersede only its explicitly named previous draft', () => {
+  const replacement = { versionName: '0.1.0', versionCodes: { arm: 1003, arm64: 1004 },
+    replacesDraftVersionCodes: [1001, 1002] };
+  const previous = { name: 'Rhenium 0.1.0', status: 'draft', versionCodes: ['1002', '1001'] };
+  const current = { name: 'Existing release', status: 'completed', versionCodes: ['900'] };
+  const track = { track: 'internal', releases: [current, previous] };
+  const result = mergeDraft(track, replacement);
+  assert.deepEqual(result.releases, [current,
+    { name: 'Rhenium 0.1.0', status: 'draft', versionCodes: ['1003', '1004'] }]);
+  assert.deepEqual(mergeDraft(result, replacement), result);
+  for (const draft of [{ ...previous, name: 'Another release' },
+    { ...previous, versionCodes: ['950'] }, { ...previous, versionCodes: ['1001', '1005'] }]) {
+    assert.throws(() => mergeDraft({ track: 'internal', releases: [draft] }, replacement), /refusing to overwrite/);
+  }
+  assert.throws(() => mergeDraft({ track: 'internal', releases: [previous, previous] }, replacement), /refusing to overwrite/);
+  assert.throws(() => mergeDraft(track, { ...replacement, replacesDraftVersionCodes: undefined }), /refusing to overwrite/);
+});
+
 test('Google colon-separated SHA256 certificates normalize to the APK verifier format', () => {
   const certificate = 'E1:F1:15:3D:F5:39:03:26:FF:76:6F:1F:CC:D1:76:FF:7E:5D:1D:50:74:17:6F:CB:1B:CA:B9:99:9C:09:03:4B';
   const hex = certificate.replaceAll(':', '').toLowerCase();

@@ -19,7 +19,8 @@ or replace the installed development app.
    targets each contain one browser ABI. Use consecutive version codes in one
    release, with the ARM64 code higher so capable devices receive it. Do not
    combine independently generated native libraries or V8 snapshots by hand.
-   Initial candidate: version `0.1.0`, codes `1001`/`1002` in
+   First candidate: version `0.1.0`, codes `1001`/`1002`. The replacement uses
+   codes `1003`/`1004` in
    [android.json](../release/android.json).
 3. Generate an independent upload key outside the repository. Keep its password
    and keystore private and back them up in GitHub Actions secrets. Sign archived
@@ -204,17 +205,21 @@ removed from the private GitHub draft. The current verifier rejects that
 licensing activity before attaching GitHub downloads. It does not modify signed
 APKs or simulate installation by Google Play.
 
-Owner action: in [Play Console](https://play.google.com/console/), select Rhenium,
-then **App integrity → Automatic protection / Installer check** and turn off
-**Require installation from Google Play**, or use **Turn off protection for this
-release** in the internal draft. Save the change. Google's
+The owner has now confirmed the saved setting with a refreshed Console capture:
+**0 of 1 service active — Installer checks off**. A subsequent
+[download attempt](https://github.com/smolcars/rhenium/actions/runs/39084273456)
+still returned the protected APKs and correctly failed verification before
+attaching them to GitHub. Google's
 [installer-check guide](https://support.google.com/googleplay/android-developer/answer/15621622?hl=en)
 and [unprotected-distribution guidance](https://support.google.com/googleplay/android-developer/answer/10183279?hl=en-GB)
-describe these controls. Once an unprotected single-file distribution APK is
-available, rerun `download`, validate both APKs, test the ARM32 APK on the TV,
-then publish the authorized GitHub prerelease and replace the README's pending
-download status. Keep the existing source/build caches and version codes unless
-Google actually requires a new upload; do not start a full rebuild speculatively.
+describe these controls and fresh uploads with protection disabled. Prepare new
+`0.1.0` bundles using version codes `1003`/`1004`, reusing the existing build
+outputs. Preserve the original bundles and evidence separately. The staging
+configuration explicitly permits replacing only the previous `Rhenium 0.1.0`
+draft with codes `1001`/`1002`; unrelated drafts and non-draft releases remain
+protected. Once an unprotected single-file APK is available, validate both APKs,
+test the ARM32 APK on the TV, then publish the authorized GitHub prerelease and
+replace the README's pending download status. No full clean build is required.
 
 ## Public-release gates
 

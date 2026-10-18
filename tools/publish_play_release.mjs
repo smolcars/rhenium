@@ -13,8 +13,11 @@ const UPLOAD = 'https://androidpublisher.googleapis.com/upload/androidpublisher/
 export function mergeDraft(track, config) {
   if (!/^(?:tv:)?(?:internal|qa)$/.test(track.track)) throw new Error('Only internal testing drafts are supported.');
   const codes = Object.values(config.versionCodes).map(String).sort();
+  const previousCodes = config.replacesDraftVersionCodes?.map(String).sort();
   const drafts = (track.releases ?? []).filter(release => release.status === 'draft');
-  if (drafts.length && (drafts.length !== 1 || JSON.stringify([...(drafts[0].versionCodes ?? [])].sort()) !== JSON.stringify(codes))) {
+  const matches = expected => JSON.stringify([...(drafts[0]?.versionCodes ?? [])].sort()) === JSON.stringify(expected);
+  const replacesPrevious = previousCodes && drafts[0]?.name === `Rhenium ${config.versionName}` && matches(previousCodes);
+  if (drafts.length && (drafts.length !== 1 || (!matches(codes) && !replacesPrevious))) {
     throw new Error('The internal track already has another draft; refusing to overwrite it.');
   }
   return {
