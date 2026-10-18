@@ -12,6 +12,7 @@ on:
           - stage
           - download
           - preflight
+          - production-draft
           - listing
           - images
           - contact
@@ -71,6 +72,11 @@ jobs:
         env:
           GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
         run: node tools/publish_play_release.mjs listing
+      - name: Save an unsubmitted production draft with existing bundles
+        if: inputs.operation == 'production-draft'
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: node tools/publish_play_release.mjs production-draft
       - name: Save missing store images without changing release tracks
         if: inputs.operation == 'images'
         env:

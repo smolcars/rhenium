@@ -288,7 +288,14 @@ The subsequent check confirmed both descriptions plus one icon, one feature
 graphic, one TV banner and two TV screenshots. It also found missing support
 contact details. `operation=contact`, with the owner's public `support_email`
 workflow input, fills only missing email/website fields and does not change
-release tracks. API access checks share the publishing concurrency group so
+release tracks. The owner-approved `rhenium-support@proton.me` and the project
+website have now been saved; a fresh edit confirms both fields are present.
+Production assignment still returns Google's generic HTTP 400 precondition error.
+`operation=production-draft` can prepare an unsubmitted production draft using
+the already uploaded bundles. It refuses to replace another production release,
+uses only `draft` status, and verifies the saved draft lifecycle after committing.
+It cannot submit for review, publish, or accept legal agreements.
+API access checks share the publishing concurrency group so
 simultaneous checks cannot invalidate publishing edits.
 
 Successful compilation is not a claim of Play approval. Before a public rollout,

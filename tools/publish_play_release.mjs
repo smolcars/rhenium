@@ -191,6 +191,53 @@ export async function preflight(api, config) {
   }
 }
 
+export async function prepareProductionDraft(api, config) {
+  const app = encodeURIComponent(config.packageName);
+  const base = `${API}${app}/edits`;
+  const edit = await api.json(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  if (!edit.id) throw new Error('Play returned no edit ID.');
+  const editUrl = `${base}/${encodeURIComponent(edit.id)}`;
+  let committed = false;
+  try {
+    const tracks = (await api.json(`${editUrl}/tracks`)).tracks ?? [];
+    const track = ['tv:production', 'production'].map(name => tracks.find(item => item.track === name)).find(Boolean);
+    const codes = Object.values(config.versionCodes).map(String).sort();
+    const matches = release => release.name === `Rhenium ${config.versionName}` && release.status === 'draft' &&
+      JSON.stringify([...(release.versionCodes ?? [])].sort()) === JSON.stringify(codes);
+    if (!track || (track.releases?.length && (track.releases.length !== 1 || !matches(track.releases[0])))) {
+      throw new Error('Production already has another release; refusing to overwrite it.');
+    }
+    if (track.releases?.length) { console.log('The matching production draft already exists; preserved without changes.'); return; }
+    const bundles = (await api.json(`${editUrl}/bundles`)).bundles ?? [];
+    if (!codes.every(code => bundles.some(bundle => String(bundle.versionCode) === code))) {
+      throw new Error('Both release bundles must already be uploaded; production drafting never uploads binaries.');
+    }
+    console.log('Saving an unsubmitted production draft with the existing bundles.');
+    await api.json(`${editUrl}/tracks/${encodeURIComponent(track.track)}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        track: track.track, releases: [{ name: `Rhenium ${config.versionName}`, versionCodes: codes, status: 'draft' }],
+      }),
+    });
+    await api.json(`${editUrl}:validate`, { method: 'POST' });
+    await api.json(`${editUrl}:commit?changesInReviewBehavior=ERROR_IF_IN_REVIEW`, { method: 'POST' });
+    committed = true;
+    const saved = await api.json(`${API}${app}/tracks/${encodeURIComponent(track.track)}/releases`);
+    const matching = (saved.releases ?? []).filter(release =>
+      JSON.stringify((release.activeArtifacts ?? []).map(item => String(item.versionCode)).sort()) === JSON.stringify(codes));
+    if (matching.length !== 1 || matching[0].releaseLifecycleState !== 'RELEASE_LIFECYCLE_STATE_DRAFT') {
+      throw new Error('Google did not confirm the production draft; inspect Play Console before further publishing.');
+    }
+    console.log(JSON.stringify({ packageName: config.packageName, track: track.track, versionCodes: codes,
+      releaseLifecycleState: matching[0].releaseLifecycleState }, null, 2));
+    console.log('Production draft saved; it was not submitted for review or rolled out.');
+  } finally {
+    if (!committed) {
+      const discarded = await api.request(editUrl, { method: 'DELETE' });
+      if (!discarded.ok && discarded.status !== 404) throw new Error(`Production draft edit cleanup failed (HTTP ${discarded.status}).`);
+    }
+  }
+}
+
 export async function prepareListing(api, config) {
   const content = JSON.parse(readFileSync(new URL('../release/play-listing/en-US.json', import.meta.url), 'utf8'));
   if (typeof content.shortDescription !== 'string' || !content.shortDescription.length || content.shortDescription.length > 80 ||
@@ -322,8 +369,8 @@ async function download(api, config, directory) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const [operation, directory] = process.argv.slice(2);
-    if (!['stage', 'download', 'preflight', 'listing', 'images', 'contact'].includes(operation) || (['stage', 'download'].includes(operation) && !directory)) {
-      throw new Error('Usage: publish_play_release.mjs stage|download DIRECTORY, preflight, listing, images, or contact');
+    if (!['stage', 'download', 'preflight', 'production-draft', 'listing', 'images', 'contact'].includes(operation) || (['stage', 'download'].includes(operation) && !directory)) {
+      throw new Error('Usage: publish_play_release.mjs stage|download DIRECTORY, preflight, production-draft, listing, images, or contact');
     }
     let credentials;
     try { credentials = JSON.parse(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON ?? '{}'); }
@@ -331,7 +378,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     delete process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
     const config = JSON.parse(readFileSync(new URL('../release/android.json', import.meta.url), 'utf8'));
     const api = client(await authenticate(credentials));
-    const run = { stage, download, preflight, listing: prepareListing, images: prepareImages,
+    const run = { stage, download, preflight, 'production-draft': prepareProductionDraft, listing: prepareListing, images: prepareImages,
       contact: (api, config) => prepareContact(api, config, process.env.RHENIUM_PLAY_CONTACT_EMAIL) }[operation];
     await run(api, config, directory);
   } catch (error) {

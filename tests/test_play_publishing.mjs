@@ -4,9 +4,48 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { mergeDraft, selectUniversalApks, stage, preflight, prepareListing, prepareImages, prepareContact } from '../tools/publish_play_release.mjs';
+import { mergeDraft, selectUniversalApks, stage, preflight, prepareProductionDraft, prepareListing, prepareImages, prepareContact } from '../tools/publish_play_release.mjs';
 
 const config = { versionName: '0.1.0', versionCodes: { arm: 1001, arm64: 1002 } };
+
+test('production drafting preserves other releases, discards rejected edits, and verifies draft lifecycle', async () => {
+  for (const scenario of ['empty', 'existing', 'other-draft', 'live', 'rejected', 'in-review', 'missing-bundle']) {
+    let committed = false, discarded = false;
+    const draft = { name: 'Rhenium 0.1.0', status: 'draft', versionCodes: ['1001', '1002'] };
+    const releases = scenario === 'existing' ? [draft] : scenario === 'other-draft' ? [{ ...draft, versionCodes: ['900'] }] :
+      scenario === 'live' ? [{ ...draft, status: 'completed' }] : [];
+    const api = {
+      json: async (url, options = {}) => {
+        const path = new URL(url).pathname;
+        if (path.endsWith('/edits')) return { id: 'production-draft' };
+        if (path.endsWith('/tracks')) return { tracks: [{ track: 'production', releases }] };
+        if (path.endsWith('/bundles')) return { bundles: scenario === 'missing-bundle' ? [] : [{ versionCode: 1001 }, { versionCode: 1002 }] };
+        if (path.endsWith('/tracks/production')) {
+          assert.deepEqual(JSON.parse(options.body), { track: 'production', releases: [draft] });
+          if (scenario === 'rejected') throw new Error('Precondition check failed.');
+          return {};
+        }
+        if (path.endsWith(':validate')) return {};
+        if (path.endsWith(':commit')) {
+          assert.equal(new URL(url).searchParams.get('changesInReviewBehavior'), 'ERROR_IF_IN_REVIEW');
+          committed = true; return {};
+        }
+        if (path.endsWith('/tracks/production/releases')) {
+          assert.ok(committed);
+          return { releases: [{ releaseLifecycleState: scenario === 'in-review' ? 'RELEASE_LIFECYCLE_STATE_IN_REVIEW' : 'RELEASE_LIFECYCLE_STATE_DRAFT',
+            activeArtifacts: [{ versionCode: 1001 }, { versionCode: 1002 }] }] };
+        }
+        assert.fail(url);
+      },
+      request: async (url, options) => { assert.equal(options.method, 'DELETE'); discarded = true; return { ok: true }; },
+    };
+    const operation = prepareProductionDraft(api, { ...config, packageName: 'com.nitesh.rhenium' });
+    if (['empty', 'existing'].includes(scenario)) await operation;
+    else await assert.rejects(operation, /refusing|Precondition|confirm|already be uploaded/);
+    assert.equal(committed, ['empty', 'in-review'].includes(scenario));
+    assert.equal(discarded, !committed);
+  }
+});
 
 test('contact preparation requires the owner email and preserves existing contact details', async () => {
   await assert.rejects(prepareContact({}, config, ''), /owner-approved/);
