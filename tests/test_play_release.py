@@ -10,7 +10,7 @@ import zipfile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from build_play_release import read_config
 from package_play_release import check_elf, check_manifest, strip_signatures
-from verify_play_apks import check_apk_manifest
+from verify_play_apks import check_apk_manifest, check_apk_signatures
 
 
 class PlayReleaseConfigTests(unittest.TestCase):
@@ -34,6 +34,27 @@ class PlayReleaseConfigTests(unittest.TestCase):
 
 
 class PlayBundleValidationTests(unittest.TestCase):
+    def test_google_hybrid_signature_report_keeps_classical_api_identity_pinned(self) -> None:
+        certificate = "e1f1153df5390326ff766f1fccd176ff7e5d1d5074176fcb1bcab9999c09034b"
+        hybrid = "a8e138fa6373273aa6f0cee67c7547c8116037bab9886be22fa3a2b2edab6d83"
+        pqc = "f8d605a35791d467053a9f3cf253064e48deaf630c9b37dd2ffc8228bd81c1cd"
+        # Public certificate lines captured from the real Play-generated APK.
+        report = (f"V3.2 Hybrid Classical Signer: (minSdkVersion=37, maxSdkVersion=2147483647) certificate SHA-256 digest: {hybrid}\n"
+                  f"V3.2 Hybrid PQC Signer: (minSdkVersion=37, maxSdkVersion=2147483647) certificate SHA-256 digest: {pqc}\n"
+                  f"V3.0 Signer: certificate SHA-256 digest: {certificate}\n"
+                  f"Source Stamp Signer: certificate SHA-256 digest: {'3' * 64}\n")
+        self.assertEqual(check_apk_signatures(report, certificate),
+                         {"classical": certificate, "hybridClassical": hybrid, "hybridPqc": pqc})
+        legacy = f"Signer #1 certificate SHA-256 digest: {certificate}\n"
+        self.assertEqual(check_apk_signatures(legacy, certificate), {"classical": certificate})
+        for invalid in (report.replace(f"V3.0 Signer: certificate SHA-256 digest: {certificate}",
+                                       f"V3.0 Signer: certificate SHA-256 digest: {'b' * 64}"),
+                        report.replace("V3.0 Signer:", "Source Stamp Signer:"),
+                        report + legacy,
+                        report.replace(f"certificate SHA-256 digest: {pqc}", "certificate SHA-256 digest: invalid")):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                check_apk_signatures(invalid, certificate)
+
     def test_apk_manifest_checks_the_leanback_alias_in_the_binary_tree(self) -> None:
         config = {"packageName": "com.nitesh.rhenium", "versionName": "0.1.0",
                   "versionCodes": {"arm": 1001, "arm64": 1002}}

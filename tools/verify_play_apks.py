@@ -14,6 +14,24 @@ from checkout import PROJECT
 from package_play_release import check_elf
 
 
+def check_apk_signatures(signatures: str, certificate: str) -> dict[str, str]:
+    actual = re.findall(r"^(?:Signer #\d+|V3\.0 Signer:) certificate SHA-256 digest: ([a-fA-F0-9]{64})$", signatures, re.M)
+    if [value.lower() for value in actual] != [certificate]:
+        raise ValueError(f"APK signer does not match Google Play certificate {certificate}. Public certificate report:\n{signatures}")
+    certificates = {"classical": certificate}
+    for label, key in (("Classical", "hybridClassical"), ("PQC", "hybridPqc")):
+        matches = re.findall(
+            rf"^V3\.2 Hybrid {label} Signer: \(minSdkVersion=\d+, maxSdkVersion=\d+\) certificate SHA-256 digest: ([a-fA-F0-9]{{64}})$",
+            signatures, re.M)
+        if len(matches) > 1:
+            raise ValueError("Ambiguous hybrid signer certificate report")
+        if matches:
+            certificates[key] = matches[0].lower()
+    if "V3.2 Hybrid " in signatures and len(certificates) != 3:
+        raise ValueError("Incomplete hybrid signer certificate report")
+    return certificates
+
+
 def check_apk_manifest(badging: str, tree: str, config: dict[str, Any], arch: str) -> None:
     package = re.search(r"^package: name='([^']*)' versionCode='([^']*)' versionName='([^']*)'", badging, re.M)
     if not package or package.groups() != (config["packageName"], str(config["versionCodes"][arch]), config["versionName"]):
@@ -63,9 +81,7 @@ def verify(sdk: Path, directory: Path) -> list[dict[str, Any]]:
         if digest != item["sha256"]:
             raise ValueError("Downloaded APK checksum does not match its record")
         signatures = subprocess.check_output([str(tools / "apksigner"), "verify", "--print-certs", str(apk)], text=True)
-        actual = re.findall(r"^Signer #\d+ certificate SHA-256 digest: ([a-fA-F0-9]+)$", signatures, re.M)
-        if [value.lower() for value in actual] != [certificate]:
-            raise ValueError(f"APK signer does not match Google Play certificate {certificate}. Public certificate report:\n{signatures}")
+        signing_certificates = check_apk_signatures(signatures, certificate)
         alignment = ["-P", "16"] if arch == "arm64" else []
         subprocess.run([str(tools / "zipalign"), "-c", *alignment, "4", str(apk)], check=True)
         badging = subprocess.check_output([str(tools / "aapt2"), "dump", "badging", str(apk)], text=True)
@@ -83,10 +99,12 @@ def verify(sdk: Path, directory: Path) -> list[dict[str, Any]]:
                         native[name] = check_elf(library.read(1024 * 1024), abi)
         if not any(name.endswith("/libchrome.so") for name in native):
             raise ValueError("APK has no browser native library")
-        reports.append({**item, "signatureVerified": True, "manifestVerified": True,
+        reports.append({**item, "signatureVerified": True, "appSigningCertificates": signing_certificates, "manifestVerified": True,
                         "nativeLoadAlignments": native, "zipAlignment": 16384 if arch == "arm64" else 4096})
     if len({item["certificateSha256"] for item in reports}) != 1:
         raise ValueError("The two APKs have different app-signing identities")
+    if reports[0]["appSigningCertificates"] != reports[1]["appSigningCertificates"]:
+        raise ValueError("The two APKs have different hybrid app-signing identities")
     (directory / "verification.json").write_text(json.dumps(reports, indent=2) + "\n")
     return reports
 
