@@ -299,10 +299,16 @@ The [production-draft attempt](https://github.com/smolcars/rhenium/actions/runs/
 also returned `HTTP 400: Precondition check failed`; it did not save a production
 draft. The [post-contact preflight](https://github.com/smolcars/rhenium/actions/runs/39087079919)
 confirms the saved descriptions, all five images, and both contact fields.
-The existing internal draft remains intact. The API does not identify the missing
-prerequisite, so the owner must inspect the app Dashboard or the Production
-release screen for its actual blocker. Do not infer an incomplete declaration,
-testing requirement, or account type from this generic error. Google documents
+The existing internal draft remains intact. The owner's Production screenshot
+then confirmed the blocker: **Rhenium does not have production access yet**.
+The page directs the owner to apply for access on the Dashboard. The screenshot
+does not show closed-test progress or account creation date. For personal accounts
+created after 13 November 2023, Google's [production-access requirements](https://support.google.com/googleplay/android-developer/answer/14151465?hl=en)
+include at least 12 testers continuously opted into a closed test for 14 days,
+then a production-access application. Internal testing and GitHub sideloads do
+not satisfy that closed-test requirement. Inspect the Dashboard for the account's
+actual progress; do not repeat production API attempts before access is granted.
+Google documents
 initial publication and legal consents as [Console steps](https://developers.google.com/android-publisher/edits).
 API access checks share the publishing concurrency group so
 simultaneous checks cannot invalidate publishing edits.
