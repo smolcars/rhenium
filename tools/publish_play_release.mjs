@@ -58,7 +58,7 @@ function client(token) {
   return { request, json };
 }
 
-async function stage(api, config, directory) {
+export async function stage(api, config, directory) {
   const app = encodeURIComponent(config.packageName);
   const base = `${API}${app}/edits`;
   const certificate = readFileSync(new URL('../release/upload-cert.sha256', import.meta.url), 'utf8').trim();
@@ -114,10 +114,19 @@ async function stage(api, config, directory) {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(desired),
     });
     await api.json(`${editUrl}:validate`, { method: 'POST' });
-    await api.json(`${editUrl}:commit?changesNotSentForReview=true&changesInReviewBehavior=ERROR_IF_IN_REVIEW`, { method: 'POST' });
+    // Draft status keeps this release unserved. The rejected-changes option is
+    // not a general draft switch and Google rejects it for a new app.
+    await api.json(`${editUrl}:commit?changesInReviewBehavior=ERROR_IF_IN_REVIEW`, { method: 'POST' });
     committed = true;
+    const saved = await api.json(`${API}${app}/tracks/${encodeURIComponent(track.track)}/releases`);
+    const codes = artifacts.map(artifact => artifact.code).sort((a, b) => a - b);
+    const matching = (saved.releases ?? []).filter(release =>
+      JSON.stringify((release.activeArtifacts ?? []).map(artifact => Number(artifact.versionCode)).sort((a, b) => a - b)) === JSON.stringify(codes));
+    if (matching.length !== 1 || matching[0].releaseLifecycleState !== 'RELEASE_LIFECYCLE_STATE_DRAFT') {
+      throw new Error('Google did not confirm the saved release is a draft; inspect Play Console before any further publishing.');
+    }
     console.log(JSON.stringify({ packageName: config.packageName, track: track.track, status: 'draft',
-      versionCodes: artifacts.map(artifact => artifact.code) }, null, 2));
+      releaseLifecycleState: matching[0].releaseLifecycleState, versionCodes: codes }, null, 2));
   } finally {
     if (!committed) {
       const discarded = await api.request(editUrl, { method: 'DELETE' });

@@ -1,8 +1,68 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
-import { mergeDraft, selectUniversalApks } from '../tools/publish_play_release.mjs';
+import { mergeDraft, selectUniversalApks, stage } from '../tools/publish_play_release.mjs';
 
 const config = { versionName: '0.1.0', versionCodes: { arm: 1001, arm64: 1002 } };
+
+test('a new internal draft commits without the rejected-changes option and verifies its lifecycle', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'rhenium-play-draft-'));
+  const release = { ...config, packageName: 'com.nitesh.rhenium' };
+  const bundles = [];
+  const certificate = readFileSync(new URL('../release/upload-cert.sha256', import.meta.url), 'utf8').trim();
+  try {
+    for (const arch of ['arm', 'arm64']) {
+      const bytes = Buffer.from(`Synthetic publisher test bundle: ${arch}`);
+      const sha256 = createHash('sha256').update(bytes).digest('hex');
+      bundles.push({ versionCode: config.versionCodes[arch], sha256 });
+      writeFileSync(join(directory, `rhenium-0.1.0-${arch}.aab`), bytes);
+      writeFileSync(join(directory, `validation-${arch}.json`), JSON.stringify({
+        packageName: release.packageName, versionName: release.versionName,
+        versionCode: config.versionCodes[arch], sha256,
+        uploadCertificateSha256: certificate, verifiedApks: ['synthetic-test.apk'],
+      }));
+    }
+    for (const lifecycle of ['RELEASE_LIFECYCLE_STATE_DRAFT', 'RELEASE_LIFECYCLE_STATE_IN_REVIEW']) {
+      let committed = false;
+      const api = {
+        json: async (url, options = {}) => {
+          const path = new URL(url).pathname;
+          if (path.endsWith('/edits')) return { id: 'synthetic-edit' };
+          if (path.endsWith('/edits/synthetic-edit/tracks')) return { tracks: [{ track: 'internal' }] };
+          if (path.endsWith('/bundles')) return { bundles };
+          if (path.endsWith('/edits/synthetic-edit/tracks/internal')) {
+            assert.equal(options.method, 'PUT');
+            assert.deepEqual(JSON.parse(options.body), mergeDraft({ track: 'internal' }, release));
+            return {};
+          }
+          if (path.endsWith(':validate')) return {};
+          if (path.endsWith(':commit')) {
+            // Exact rejection returned by Google for the first release.
+            if (new URL(url).searchParams.has('changesNotSentForReview')) {
+              throw new Error('Play request failed (HTTP 400): Changes are sent for review automatically. The query parameter changesNotSentForReview must not be set.');
+            }
+            assert.equal(new URL(url).searchParams.get('changesInReviewBehavior'), 'ERROR_IF_IN_REVIEW');
+            committed = true;
+            return {};
+          }
+          if (path.endsWith('/tracks/internal/releases')) {
+            assert.equal(committed, true);
+            return { releases: [{ releaseLifecycleState: lifecycle,
+              activeArtifacts: [{ versionCode: 1001 }, { versionCode: 1002 }] }] };
+          }
+          assert.fail(`Unexpected publishing request: ${url}`);
+        },
+        request: async () => ({ ok: true }),
+      };
+      if (lifecycle === 'RELEASE_LIFECYCLE_STATE_DRAFT') await stage(api, release, directory);
+      else await assert.rejects(stage(api, release, directory), /confirm.*draft/);
+      assert.equal(committed, true);
+    }
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
 
 test('internal drafting preserves the current release and cannot target production', () => {
   const current = { name: 'Previous', versionCodes: ['900'], status: 'completed' };

@@ -55,8 +55,9 @@ python3 tools/package_play_release.py "$HOME/.cache/brave-tv/workspace" \
   --archive "$HOME/.cache/brave-tv/artifacts/rhenium-0.1.0-play"
 ```
 
-The current runner uses `rhenium-play-release-r10.service`, eight local/total Siso
-steps, ten allowed CPUs, and 20/22 GiB soft/hard memory limits. Earlier setup
+Both release builds and signing completed successfully in
+`rhenium-play-release-r10.service`. It used eight local/total Siso steps, ten
+allowed CPUs, and 20/22 GiB soft/hard memory limits. Earlier setup
 attempts stopped during GN generation without compiling a browser. No existing
 Debug/Static output was removed. Native symbols use level zero to fit this
 builder; retain Java mappings and report that full native debug information is
@@ -72,8 +73,9 @@ already removes that automatic initialization provider from its base manifest.
 The Brave manifest fragment now applies the same removal when rendered into
 the feature module. This keeps APK and bundle startup behavior consistent;
 the isolated-split validation remains enabled. The saved packaging command
-reproduced this exact failure before the source correction. The incremental
-rebuild checks the correction and then automatically starts ARM32.
+reproduced this exact failure before the source correction. Both final builds
+passed the isolated-split check after this correction. ARM32 started automatically after
+ARM64 and completed in 2 hours 55 minutes.
 The archive validator reads release metadata from the base manifest and the TV
 launcher from the install-time `chrome` module, where Chromium places activities.
 It checks that both manifests have the release package and that the exported TV
@@ -93,13 +95,16 @@ Play access has been verified for `com.nitesh.rhenium`: authentication and app
 access succeed, and the temporary edit is discarded. The first inspection found
 no uploaded bundles, APKs or releases. GitHub Actions also restored the encrypted
 keystore backup and verified its public certificate fingerprint successfully.
-Build and runtime acceptance are still pending.
+The ARM32 and ARM64 bundles are built, signed and statically validated. Physical
+ARM32 release acceptance passed on the Android 14 Chromecast; final Play-signed
+APK acceptance is pending the publishing workflow.
 
 The [publishing workflow](../.github/workflows/play-release.yml) is manual. Its
 `stage` operation downloads the candidate AABs and validation reports from the
 GitHub draft `v0.1.0`, verifies their recorded checksums and upload certificate,
 and commits only an internal-testing draft. It preserves existing releases,
-refuses to overwrite another draft, and does not send changes for review. Its
+refuses to overwrite another draft, and requires Google to report the saved
+release lifecycle as `RELEASE_LIFECYCLE_STATE_DRAFT`. Its
 `download` operation retrieves Play-signed universal APKs, verifies their actual
 signatures, package, ABI and alignment, and attaches them to the GitHub draft.
 The public GitHub release is published after the artifact and runtime checks.
@@ -116,10 +121,50 @@ The existing Debug and Static ARM generated headers already contain an empty
 Brave services key. The recorded native Shields checks pass network blocking,
 cosmetic hiding and scriptlet execution with that configuration. Rhenium ships
 bundled filter data and its own signed GitHub filter-bundle updater, which does
-not authenticate to Brave's component service. Repeat blocking, per-site
-disable/re-enable and filter-refresh checks on the release candidate. This does
-not establish availability of other retained Brave-hosted services or every
+not authenticate to Brave's component service. The release candidate passed
+network blocking, native per-site disable/re-enable,
+cosmetic filtering and scriptlet execution on the physical ARM32 TV. The cosmetic
+and scriptlet checks used controlled HTML and shipped rules with the native
+Shields toggle; no publisher content was fetched and no custom rules were added.
+The native update control downloaded the signed snapshot published 10 October
+2026, activated it after restart, and reported the latest snapshot on recheck.
+Network blocking still passed after that restart. This does not establish
+availability of other retained Brave-hosted services or every
 component-update feed.
+
+## Validated candidate artifacts
+
+The local archive is `~/.cache/brave-tv/artifacts/rhenium-0.1.0-play/`. It contains
+both signed AABs, validation reports, exported manifests, separate R8 mappings,
+build logs and arguments, source revisions, download sizes and physical-test
+evidence. Private signing credentials are stored separately. Local `.apks` files
+use the upload key for testing; they are not final public downloads.
+
+| Bundle | Version code | SHA-256 |
+| --- | --- | --- |
+| ARM32 | 1001 | `04200f27b5edb9380ff499ee13d2eafeba25814b82954084b974676a208f943c` |
+| ARM64 | 1002 | `5ead0e626efda8b24e7a673e03e1daba2af3eebc80219f12e3aa799fcc2eb07d` |
+
+Both bundles have the production package, non-debuggable manifest and exported
+TV entry. ARM64 native ELF and generated test APK ZIP alignment passed the 16 KB
+checks. Estimated compressed downloads are 109 MB for ARM32 and 146 MB for ARM64;
+actual Play delivery depends on the device. ARM64 hardware and 16 KB runtime
+coverage remain unverified.
+
+Both bundles and validation reports are attached to the existing GitHub draft
+`v0.1.0`, with remote checksums verified. The first
+[Play staging run](https://github.com/smolcars/rhenium/actions/runs/39082629444)
+uploaded and verified both bundles, then Google rejected the commit parameter
+`changesNotSentForReview=true` (HTTP 400). That option applies to rejected
+changes; it is not a general draft switch. The failed edit was discarded, and a
+read-only APK retrieval confirmed that its versions were not retained (404).
+The corrected helper commits the explicit internal `draft`, retains
+`ERROR_IF_IN_REVIEW`, then reads the release lifecycle and fails unless Google
+confirms `RELEASE_LIFECYCLE_STATE_DRAFT`. A regression exercises the actual stage
+flow, Google's exact parameter rejection, and rejection of an in-review result.
+The rerun and final Play-signed APK checks must pass before public release.
+See [commit parameters](https://developers.google.com/android-publisher/api-ref/rest/v3/edits/commit)
+and [release lifecycle states](https://developers.google.com/android-publisher/api-ref/rest/v3/applications.tracks.releases).
 
 ## Public-release gates
 
