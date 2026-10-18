@@ -163,20 +163,25 @@ export async function preflight(api, config) {
       throw new Error('The release bundles are not already uploaded; preflight never uploads new binaries.');
     }
     const listings = (await api.json(`${editUrl}/listings`)).listings ?? [];
+    const details = await api.json(`${editUrl}/details`);
     const imageCounts = {};
     for (const type of ['icon', 'featureGraphic', 'tvBanner', 'tvScreenshots']) {
       imageCounts[type] = ((await api.json(`${editUrl}/listings/en-US/${type}`)).images ?? []).length;
     }
     console.log(JSON.stringify({ packageName: config.packageName, track: track.track, versionCodes: codes,
       imageCounts,
+      contactEmailPresent: Boolean(details.contactEmail),
+      contactWebsitePresent: Boolean(details.contactWebsite),
       storeListings: listings.map(item => ({ language: item.language, titlePresent: Boolean(item.title),
         shortDescriptionPresent: Boolean(item.shortDescription), fullDescriptionPresent: Boolean(item.fullDescription) })) }, null, 2));
     // This status exists only inside the temporary edit. Never call commit here.
+    console.log('Checking production track assignment inside the temporary edit.');
     await api.json(`${editUrl}/tracks/${encodeURIComponent(track.track)}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
         track: track.track, releases: [{ name: `Rhenium ${config.versionName}`, versionCodes: codes, status: 'completed' }],
       }),
     });
+    console.log('Production track assignment accepted; checking release requirements.');
     await api.json(`${editUrl}:validate`, { method: 'POST' });
     console.log('Production candidate passed API validation. This is not policy approval or publication.');
   } finally {

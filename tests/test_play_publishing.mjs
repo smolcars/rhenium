@@ -20,6 +20,7 @@ test('production preflight validates only a temporary edit and discards it even 
         if (path.endsWith('/tracks')) return { tracks: [{ track: 'production', releases: [] }] };
         if (path.endsWith('/bundles')) return { bundles: [{ versionCode: 1001 }, { versionCode: 1002 }] };
         if (path.endsWith('/listings')) return { listings: [] };
+        if (path.endsWith('/details')) return { contactEmail: 'support@example.test' };
         if (/\/listings\/en-US\/(icon|featureGraphic|tvBanner|tvScreenshots)$/.test(path)) return { images: [] };
         if (path.endsWith('/tracks/production')) {
           assert.equal(options.method, 'PUT');

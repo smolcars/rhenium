@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: rhenium-play-publishing
+  cancel-in-progress: false
+
 jobs:
   check:
     runs-on: ubuntu-24.04
