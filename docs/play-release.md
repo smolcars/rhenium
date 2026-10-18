@@ -288,7 +288,7 @@ Closed Alpha targets all 177 selectable countries/regions plus rest of world.
 These changes are saved in Publishing overview, not submitted or approved.
 
 The existing Alpha release still contains codes **1003 / 1004**. Its Console
-preview reports three blocking declarations:
+preview initially reported three blocking declarations:
 
 - `QUERY_ALL_PACKAGES`, for installed-app matching when opening links/files.
 - `REQUEST_INSTALL_PACKAGES`, for user-requested downloaded APK installation.
@@ -319,9 +319,12 @@ is present in the actual 1003/1004 manifests as `uses-permission-sdk-23`.
 contains the feature explanation; usage is **App functionality**, and the
 permitted functionality is **Web browsing or search** where offered. The full
 description in `release/play-listing/en-US.json` now explains this feature too.
-The owner must add that paragraph to the saved Play listing: changing the source
-file does not update an existing listing, and the fill-missing helper preserves
-existing descriptions. No Play API edit was made while the owner filled forms.
+The feature paragraph has now been saved in the English Play listing through
+Console. The APK-installation declaration was also saved with **web browsing**,
+**App functionality**, the explanation above, and the public video link below.
+A fresh release preview confirms that the installation-permission error has
+cleared: **two errors remain**, for package visibility and foreground services.
+These saves are not review approval or release submission.
 
 The [57-second captioned review video](https://github.com/smolcars/rhenium/releases/download/v0.1.0/rhenium-apk-installation-review.mp4)
 shows the production Google-signed ARM32 APK, build 1003, opening on the physical
