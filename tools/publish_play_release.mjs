@@ -217,6 +217,42 @@ export async function prepareListing(api, config) {
   }
 }
 
+export async function prepareImages(api, config) {
+  const app = encodeURIComponent(config.packageName);
+  const base = `${API}${app}/edits`;
+  const edit = await api.json(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  if (!edit.id) throw new Error('Play returned no edit ID.');
+  const editId = encodeURIComponent(edit.id);
+  const editUrl = `${base}/${editId}`;
+  let committed = false, added = 0;
+  try {
+    for (const [type, files] of Object.entries({ icon: ['icon.png'], featureGraphic: ['feature-graphic.png'],
+      tvBanner: ['tv-banner.png'], tvScreenshots: ['tv-home.png', 'tv-menu.png'] })) {
+      const existing = await api.json(`${editUrl}/listings/en-US/${type}`);
+      if (existing.images?.length) continue;
+      for (const file of files) {
+        const uploaded = await api.json(`${UPLOAD}${app}/edits/${editId}/listings/en-US/${type}?uploadType=media`, {
+          method: 'POST', headers: { 'Content-Type': 'image/png' },
+          body: readFileSync(new URL(`../release/play-listing/images/${file}`, import.meta.url)),
+        });
+        if (!uploaded.image?.id) throw new Error(`Google did not confirm the uploaded image: ${file}`);
+        added++;
+        console.log(`Added missing store image: ${type}/${file}`);
+      }
+    }
+    if (!added) { console.log('Store image groups already exist; preserved without changes.'); return; }
+    await api.json(`${editUrl}:validate`, { method: 'POST' });
+    await api.json(`${editUrl}:commit?changesInReviewBehavior=ERROR_IF_IN_REVIEW`, { method: 'POST' });
+    committed = true;
+    console.log(`Saved ${added} missing store images; no release tracks changed.`);
+  } finally {
+    if (!committed) {
+      const discarded = await api.request(editUrl, { method: 'DELETE' });
+      if (!discarded.ok && discarded.status !== 404) throw new Error(`Image edit cleanup failed (HTTP ${discarded.status}).`);
+    }
+  }
+}
+
 async function download(api, config, directory) {
   mkdirSync(directory, { recursive: true });
   const base = `${API}${encodeURIComponent(config.packageName)}/generatedApks`;
@@ -253,8 +289,8 @@ async function download(api, config, directory) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const [operation, directory] = process.argv.slice(2);
-    if (!['stage', 'download', 'preflight', 'listing'].includes(operation) || (['stage', 'download'].includes(operation) && !directory)) {
-      throw new Error('Usage: publish_play_release.mjs stage|download DIRECTORY, preflight, or listing');
+    if (!['stage', 'download', 'preflight', 'listing', 'images'].includes(operation) || (['stage', 'download'].includes(operation) && !directory)) {
+      throw new Error('Usage: publish_play_release.mjs stage|download DIRECTORY, preflight, listing, or images');
     }
     let credentials;
     try { credentials = JSON.parse(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON ?? '{}'); }
@@ -262,7 +298,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     delete process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
     const config = JSON.parse(readFileSync(new URL('../release/android.json', import.meta.url), 'utf8'));
     const api = client(await authenticate(credentials));
-    await ({ stage, download, preflight, listing: prepareListing }[operation])(api, config, directory);
+    await ({ stage, download, preflight, listing: prepareListing, images: prepareImages }[operation])(api, config, directory);
   } catch (error) {
     console.error(error instanceof Error ? error.message : 'Play operation failed.');
     process.exitCode = 1;

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Stage a draft, prepare listing text, retrieve APKs, or check production readiness
+        description: Prepare listing text/images, stage a draft, retrieve APKs, or check readiness
         type: choice
         required: true
         default: stage
@@ -13,6 +13,7 @@ on:
           - download
           - preflight
           - listing
+          - images
 
 permissions:
   contents: write
@@ -65,6 +66,11 @@ jobs:
         env:
           GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
         run: node tools/publish_play_release.mjs listing
+      - name: Save missing store images without changing release tracks
+        if: inputs.operation == 'images'
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: node tools/publish_play_release.mjs images
       - name: Retrieve Play-signed APKs
         if: inputs.operation == 'download'
         env:

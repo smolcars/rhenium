@@ -280,6 +280,9 @@ the production candidate with `HTTP 400: Precondition check failed`. Use
 [`en-US.json`](../release/play-listing/en-US.json). Existing owner-written fields
 are preserved, and release tracks are not changed. Preflight also reports icon,
 feature graphic, TV banner and TV screenshot counts.
+`operation=images` uploads the approved exports and real TV captures in
+[`release/play-listing`](../release/play-listing/README.md) only to empty image
+groups, preserving existing images and release tracks.
 
 Successful compilation is not a claim of Play approval. Before a public rollout,
 complete the privacy policy, Data safety and permission declarations, listing

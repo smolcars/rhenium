@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { mergeDraft, selectUniversalApks, stage, preflight, prepareListing } from '../tools/publish_play_release.mjs';
+import { mergeDraft, selectUniversalApks, stage, preflight, prepareListing, prepareImages } from '../tools/publish_play_release.mjs';
 
 const config = { versionName: '0.1.0', versionCodes: { arm: 1001, arm64: 1002 } };
 
@@ -70,6 +70,39 @@ test('listing preparation fills only missing descriptions and never changes rele
     };
     await prepareListing(api, { ...config, packageName: 'com.nitesh.rhenium' });
     assert.equal(patched, !complete); assert.equal(committed, !complete); assert.equal(discarded, complete);
+  }
+});
+
+test('store image preparation preserves existing groups and commits only confirmed uploads', async () => {
+  for (const scenario of ['missing', 'existing', 'failed']) {
+    let uploaded = 0, committed = false, discarded = false;
+    const api = {
+      json: async (url, options = {}) => {
+        const parsed = new URL(url), path = parsed.pathname;
+        assert.ok(!path.includes('/tracks'));
+        if (path.endsWith('/edits')) return { id: 'images' };
+        if (path.includes('/listings/en-US/')) {
+          if (options.method !== 'POST') return { images: scenario === 'existing' ? [{ id: 'owner-image' }] : [] };
+          assert.equal(parsed.searchParams.get('uploadType'), 'media');
+          assert.equal(options.headers['Content-Type'], 'image/png');
+          assert.deepEqual(options.body.subarray(0, 8), Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+          uploaded++;
+          return scenario === 'failed' ? {} : { image: { id: `image-${uploaded}` } };
+        }
+        if (path.endsWith(':validate')) return {};
+        if (path.endsWith(':commit')) {
+          assert.equal(new URL(url).searchParams.get('changesInReviewBehavior'), 'ERROR_IF_IN_REVIEW');
+          committed = true; return {};
+        }
+        assert.fail(url);
+      },
+      request: async (url, options) => { assert.equal(options.method, 'DELETE'); discarded = true; return { ok: true }; },
+    };
+    if (scenario === 'failed') await assert.rejects(prepareImages(api, { packageName: 'com.nitesh.rhenium' }), /confirm.*image/);
+    else await prepareImages(api, { packageName: 'com.nitesh.rhenium' });
+    assert.equal(uploaded, scenario === 'existing' ? 0 : scenario === 'failed' ? 1 : 5);
+    assert.equal(committed, scenario === 'missing');
+    assert.equal(discarded, !committed);
   }
 });
 
