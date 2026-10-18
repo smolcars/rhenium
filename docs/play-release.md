@@ -43,6 +43,31 @@ unselected. The saved APK-installation declaration/video remain applicable.
 Archive: `~/.cache/brave-tv/artifacts/rhenium-0.1.1-play/`; detailed evidence:
 `~/.cache/brave-tv/evidence/play-release-0.1.1-20261018-r1/`.
 
+### First Console submission on 18 October 2026
+
+The closed Alpha release was confirmed with **1005 / 1006**, and its 14 pending
+changes were submitted through Publishing overview. Console now shows **Changes
+in review**. At confirmation, Google's automatic quick checks were still running;
+the page says the changes proceed to review when those checks complete
+successfully. This is an accepted submission, not approval or a production release.
+
+The `QUERY_ALL_PACKAGES` declaration uses the 0.1.1 app-links video and
+**App functionality**. The foreground-service declaration uses the 0.1.1
+download/media video for network downloads and media playback. Microphone is
+absent from the refreshed foreground-service form. The existing APK-installation
+declaration retains the original 0.1.0 installation video. The English listing
+now also describes opening compatible links/files in installed apps. The
+advertising-ID declaration is saved as **No**.
+
+The old **1003 / 1004** internal release was still live despite the replacement
+draft. It kept Microphone mandatory in the app-wide foreground form. Publishing
+the existing internal 0.1.1 draft replaced that live release with **1005 / 1006**;
+Console confirms it is available to internal testers. Refreshing the foreground
+form then removed Microphone, and closed-release validation passed with no errors.
+The remaining warnings concern absent deobfuscation mappings/native symbols and
+the unconfigured closed-test audience. No tester list was added or changed.
+Production access still requires the actual 12-tester, 14-day closed test.
+
 ## 0.1.0 release history
 
 [Rhenium 0.1.0](https://github.com/smolcars/rhenium/releases/tag/v0.1.0) remains
