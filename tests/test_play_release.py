@@ -58,7 +58,8 @@ class PlayBundleValidationTests(unittest.TestCase):
     def test_apk_manifest_checks_the_leanback_alias_in_the_binary_tree(self) -> None:
         config = {"packageName": "com.nitesh.rhenium", "versionName": "0.1.0",
                   "versionCodes": {"arm": 1001, "arm64": 1002}}
-        badging = "package: name='com.nitesh.rhenium' versionCode='1002' versionName='0.1.0' compileSdkVersion='37'"
+        badging = ("package: name='com.nitesh.rhenium' versionCode='1002' versionName='0.1.0' compileSdkVersion='37'\n"
+                   "uses-permission: name='android.permission.RECORD_AUDIO'")
         tree = '''E: manifest (line=1)
   E: application (line=4)
     E: activity-alias (line=122)
@@ -75,7 +76,10 @@ class PlayBundleValidationTests(unittest.TestCase):
                                   (badging.replace("1002", "1001"), tree),
                                   (badging, tree.replace("=true", "=false")),
                                   (badging, tree.replace("LEANBACK_LAUNCHER", "LAUNCHER")),
-                                  (badging, tree + '\n  E: activity\n    A: android:name="com.pairip.licensecheck.LicenseActivity"')):
+                                  (badging, tree + '\n  E: activity\n    A: android:name="com.pairip.licensecheck.LicenseActivity"'),
+                                  (badging + "\nuses-permission: name='android.permission.FOREGROUND_SERVICE_MICROPHONE'", tree),
+                                  (badging.replace('RECORD_AUDIO', 'INTERNET'), tree),
+                                  (badging, tree + '\n  E: service\n    A: android:foregroundServiceType(0x01010599)=0x82')):
             with self.subTest(manifest=manifest), self.assertRaises(ValueError):
                 check_apk_manifest(manifest, xmltree, config, "arm64")
 
@@ -112,6 +116,8 @@ class PlayBundleValidationTests(unittest.TestCase):
         xml = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android"
           package="com.nitesh.rhenium" android:versionCode="1002" android:versionName="0.1.0">
           <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
+          <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+          <uses-permission-sdk-23 android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
           <application android:debuggable="false"/></manifest>'''
         chrome = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android"
           package="com.nitesh.rhenium" split="chrome"><application>
@@ -122,14 +128,20 @@ class PlayBundleValidationTests(unittest.TestCase):
         result = check_manifest(xml, chrome, config, "arm64")
         self.assertFalse(result["debuggable"])
         self.assertEqual(result["launcherModule"], "chrome")
+        self.assertIn("android.permission.REQUEST_INSTALL_PACKAGES", result["permissions"])
         for invalid in (xml.replace('debuggable="false"', 'debuggable="true"'),
                         xml.replace('com.nitesh.rhenium', 'com.brave.browser'),
-                        xml.replace('required="false"', 'required="true"')):
+                        xml.replace('required="false"', 'required="true"'),
+                        xml.replace('RECORD_AUDIO', 'INTERNET'),
+                        xml.replace('<application ', '<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/><application ')):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 check_manifest(invalid, chrome, config, "arm64")
         for invalid in (chrome.replace('com.nitesh.rhenium', 'com.brave.browser'),
                         chrome.replace('exported="true"', 'exported="false"'),
                         chrome.replace('android.intent.action.MAIN', 'android.intent.action.VIEW'),
-                        chrome.replace('LEANBACK_LAUNCHER', 'LAUNCHER')):
+                        chrome.replace('LEANBACK_LAUNCHER', 'LAUNCHER'),
+                        chrome.replace('</application>', '<service android:foregroundServiceType="mediaPlayback|microphone"/></application>'),
+                        chrome.replace('</application>', '<service android:foregroundServiceType="0x82"/></application>'),
+                        chrome.replace('<application>', '<uses-permission-sdk-23 android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/><application>')):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 check_manifest(xml, invalid, config, "arm64")

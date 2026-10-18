@@ -38,3 +38,12 @@ the no-permission sample app and download webpage used for the review video.
 The actual production APK hands it to Android's installer; the recording shows
 both source approval and installation confirmation. Video evidence and public
 link are recorded in `docs/play-release.md`.
+
+## App links and foreground-service declarations
+
+[`remaining-permissions-declarations.md`](remaining-permissions-declarations.md)
+contains verified app-link, download and playback videos and paste-ready form
+answers. The microphone service failed physical verification; the owner chose
+to remove that unused background capability in replacement builds, while
+retaining foreground website microphone access. Do not use the other videos
+as microphone evidence or claim the currently uploaded bundles omit it.

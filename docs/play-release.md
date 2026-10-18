@@ -350,6 +350,47 @@ closed. The original browser data and installed release were preserved. Raw
 takes, captions, per-step snapshots and verification remain under
 `~/.cache/brave-tv/evidence/install-permission-video-20261018/`.
 
+### App-link, download and playback permission evidence — 18 October 2026
+
+The [19-second app-link video](https://github.com/smolcars/rhenium/releases/download/v0.1.0/rhenium-app-links-review.mp4)
+shows a website custom-scheme link opening a separately installed, permission-free
+receiver app and returning to Rhenium. The [61-second download/playback video](https://github.com/smolcars/rhenium/releases/download/v0.1.0/rhenium-download-media-review.mp4)
+shows a user-started download continuing after Android Home (0:00–0:34), then
+user-started audio continuing in the background and being paused (0:34–1:01).
+These are actual, continuous per-feature takes of the Google-signed 1003 release
+on the physical Chromecast. Only scaling, captions below the UI, a three-second
+final-frame hold per take, and the cut between download and media were added.
+There are no speed changes or reconstructed screens. Both public assets were
+downloaded without authentication and matched their local SHA-256 hashes.
+
+[`remaining-permissions-declarations.md`](../release/play-listing/remaining-permissions-declarations.md)
+contains the hashes, links, timestamps and paste-ready form answers. The source
+listing also documents opening links/files in installed apps; the owner must
+copy that feature into the saved Play description because fill-missing preserves
+nonempty descriptions. The separate [fixtures](../tests/device/permission-review/README.md)
+are not included in Rhenium. Android confirmed an active mediaPlayback service
+while backgrounded. On Android 14, downloads use a user-initiated job; the
+retained dataSync foreground-service implementation supports older Android.
+
+Microphone capture failed background verification both on a local recording
+page and in a connected two-participant Brave Talk call. Android silenced
+capture and no microphone foreground service activated. Neither video is
+microphone-service evidence. The owner chose to remove the unused background
+microphone capability while preserving foreground website microphone access.
+The [replacement-build plan](microphone-service-release-plan.md) records the
+reproducible failure and the 0.1.1 / 1005–1006 implementation and verification
+scope. The currently uploaded 1003/1004 bundles still contain that permission.
+No declaration or first submission was accepted during evidence collection.
+
+Private raw takes, event/service records, peer connection checks and captions
+are under `~/.cache/brave-tv/evidence/remaining-permissions-20261018/`. The call
+and generated-audio peer were stopped; the browser preview was closed. The
+separate receiver app and owned download file were removed, original microphone
+permission denial/flags were restored, and reverse 18094, the fixture server and
+agent-device session were closed. Owned browser test tabs/history remain for
+the replacement build's verification and will be cleaned up after that check.
+Other downloaded files and browser data were preserved.
+
 ### Closed testing and production access
 
 The owner has authorized submitting the existing 0.1.0 builds to closed testing.

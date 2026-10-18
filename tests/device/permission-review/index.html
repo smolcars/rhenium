@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rhenium feature review</title>
+<style>
+body{margin:40px;background:#142321;color:#edf5ef;font:24px/1.45 sans-serif}
+h1{font-size:36px;margin-bottom:12px}p{max-width:900px}
+button,a{display:inline-block;background:#e0eee4;color:#142321;font:inherit;border:0;border-radius:10px;padding:16px 24px;margin:8px 12px 8px 0;text-decoration:none}
+:focus-visible{outline:4px solid #93d8fb;outline-offset:5px}
+output{display:block;margin-top:24px;white-space:pre-line;font-variant-numeric:tabular-nums}
+small{display:block;margin-top:28px;color:#b9ccc2;font-size:18px}
+</style>
+<h1 id="heading"></h1><p id="description"></p><div id="actions"></div>
+<output id="status" aria-live="polite">Ready</output>
+<small>Local review test page. All actions use the browser's normal features.</small>
+<script>
+'use strict';
+const kind = location.pathname.slice(1);
+const heading = document.querySelector('#heading');
+const description = document.querySelector('#description');
+const actions = document.querySelector('#actions');
+const status = document.querySelector('#status');
+let audio, stream, recorder, chunks = 0, bytes = 0, started = 0;
+function event(name, extra = {}) {
+  const value = {kind, name, hidden: document.hidden, time: Date.now(),
+    audioTime: audio?.currentTime ?? null, paused: audio?.paused ?? null,
+    track: stream?.getAudioTracks()[0]?.readyState ?? null, chunks, bytes, ...extra};
+  navigator.sendBeacon('/event', JSON.stringify(value));
+}
+function button(label, handler) {
+  const element = document.createElement('button'); element.textContent = label;
+  element.onclick = handler; actions.append(element); return element;
+}
+if (kind === 'handoff') {
+  heading.textContent = 'Open a link in an installed app';
+  description.textContent = 'Choose Open demo app. Rhenium finds an installed app that handles this link. The demo app is a separate, permission-free review fixture.';
+  const link = document.createElement('a'); link.textContent = 'Open demo app';
+  link.href = 'rhenium-review://open';
+  link.onclick = () => event('handoff-click'); actions.append(link);
+} else if (kind === 'download') {
+  heading.textContent = 'Download a file';
+  description.textContent = 'Start the 12 MB sample download. It is paced so you can leave the browser, return, and check progress in Downloads.';
+  const link = document.createElement('a'); link.textContent = 'Download sample file';
+  link.href = '/RheniumReviewSample.txt'; link.download = 'RheniumReviewSample.txt';
+  link.onclick = () => event('download-click'); actions.append(link);
+} else if (kind === 'media') {
+  heading.textContent = 'Background audio playback';
+  description.textContent = 'Start this generated test tone, go to Google TV Home, then return. The playback clock shows the audio continuing.';
+  audio = new Audio('/review-tone.mp3'); audio.loop = true;
+  if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({title:'Rhenium audio review',artist:'Generated test tone'});
+  button('Play audio', async () => {try {await audio.play(); event('play');} catch(error) {status.textContent = error.message; event('error',{error:error.message});}});
+  button('Pause audio', () => {audio.pause(); event('pause');});
+  setInterval(() => {
+    status.textContent = `${audio.paused ? 'Paused' : 'Playing'} · ${audio.currentTime.toFixed(1)} seconds`;
+    if (!audio.paused) event('audio-progress');
+  }, 1000);
+} else if (kind === 'microphone') {
+  heading.textContent = 'Website microphone capture';
+  description.textContent = 'Start microphone, approve Android and website permission prompts, then leave and return. This page counts capture chunks locally; it does not save or upload audio.';
+  button('Start microphone', async () => {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({audio:true});
+      chunks = 0; bytes = 0; started = Date.now();
+      recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = message => {chunks++; bytes += message.data.size; event('capture-progress');};
+      recorder.start(1000); event('capture-start');
+    } catch(error) {status.textContent = `${error.name}: ${error.message}`; event('capture-error',{error:`${error.name}: ${error.message}`});}
+  });
+  button('Stop microphone', () => {
+    if (recorder?.state === 'recording') recorder.stop();
+    stream?.getTracks().forEach(track => track.stop()); event('capture-stop');
+  });
+  setInterval(() => {
+    if (stream) status.textContent = `Microphone: ${stream.getAudioTracks()[0].readyState}\n${chunks} capture chunks · ${bytes} bytes\n${Math.floor((Date.now()-started)/1000)} seconds elapsed`;
+  }, 1000);
+} else {
+  heading.textContent = 'Rhenium permission review';
+  description.textContent = 'Choose a browser feature to demonstrate.';
+  for (const item of ['handoff','download','media','microphone']) {
+    const link = document.createElement('a'); link.href = '/' + item; link.textContent = item; actions.append(link);
+  }
+}
+document.addEventListener('visibilitychange', () => event('visibility'));
+window.addEventListener('pagehide', () => event('pagehide'));
+event('page-open');
+</script>
+</html>

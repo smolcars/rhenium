@@ -10,7 +10,8 @@ const config = { versionName: '0.1.0', versionCodes: { arm: 1001, arm64: 1002 } 
 
 test('closed submission verifies uploaded bytes, protects other tracks, and confirms actual review state', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'rhenium-closed-test-'));
-  const release = { ...config, packageName: 'com.nitesh.rhenium' };
+  const release = { ...config, packageName: 'com.nitesh.rhenium',
+    replacesDraftVersionName: '0.0.9', replacesDraftVersionCodes: [901, 902] };
   const certificate = readFileSync(new URL('../release/upload-cert.sha256', import.meta.url), 'utf8').trim();
   const bundles = ['arm', 'arm64'].map(arch => {
     const sha256 = createHash('sha256').update(`Synthetic closed-test bundle ${arch}`).digest('hex');
@@ -21,10 +22,12 @@ test('closed submission verifies uploaded bytes, protects other tracks, and conf
     return { versionCode: config.versionCodes[arch], sha256 };
   });
   try {
-    for (const scenario of ['accepted', 'published', 'existing', 'not-sent', 'draft-app', 'rejected', 'other-release', 'mismatch', 'missing-bundle', 'wrong-track']) {
+    for (const scenario of ['accepted', 'previous-draft', 'previous-live', 'previous-name', 'published', 'existing', 'not-sent', 'draft-app', 'rejected', 'other-release', 'mismatch', 'missing-bundle', 'wrong-track']) {
       let committed = false, discarded = false, updated = false, savedAsDraft = false;
       const statuses = [];
       const saved = { name: 'Rhenium 0.1.0', versionCodes: ['1001', '1002'], status: 'completed' };
+      const previous = { name: scenario === 'previous-name' ? 'Another release' : 'Rhenium 0.0.9',
+        versionCodes: ['901', '902'], status: scenario === 'previous-live' ? 'completed' : 'draft' };
       const api = {
         json: async (url, options = {}) => {
           const path = new URL(url).pathname;
@@ -32,6 +35,7 @@ test('closed submission verifies uploaded bytes, protects other tracks, and conf
           if (path.endsWith('/tracks')) return { tracks: [
             { track: 'production', releases: [{ name: 'Unrelated production' }] }, { track: 'beta' },
             ...(scenario === 'wrong-track' ? [] : [{ track: 'alpha', releases: scenario === 'existing' ? [saved] :
+              scenario.startsWith('previous-') ? [previous] :
               scenario === 'other-release' ? [{ ...saved, versionCodes: ['900'] }] : [] }]),
           ] };
           if (path.endsWith('/bundles')) return { bundles: scenario === 'missing-bundle' ? bundles.slice(0, 1) :
@@ -71,11 +75,11 @@ test('closed submission verifies uploaded bytes, protects other tracks, and conf
         request: async (url, options) => { assert.equal(options.method, 'DELETE'); discarded = true; return { ok: true }; },
       };
       const operation = submitClosed(api, release, directory);
-      if (['accepted', 'published', 'existing'].includes(scenario)) await operation;
+      if (['accepted', 'previous-draft', 'published', 'existing'].includes(scenario)) await operation;
       else await assert.rejects(operation, /not confirmed|first submission|Missing Play|refusing|does not match|No alpha/);
-      assert.equal(committed, ['accepted', 'published', 'not-sent', 'draft-app'].includes(scenario));
+      assert.equal(committed, ['accepted', 'previous-draft', 'published', 'not-sent', 'draft-app'].includes(scenario));
       assert.equal(discarded, !committed);
-      assert.equal(updated, ['accepted', 'published', 'not-sent', 'draft-app', 'rejected'].includes(scenario));
+      assert.equal(updated, ['accepted', 'previous-draft', 'published', 'not-sent', 'draft-app', 'rejected'].includes(scenario));
       if (scenario === 'draft-app') assert.deepEqual(statuses, ['completed', 'draft']);
     }
   } finally { rmSync(directory, { recursive: true, force: true }); }
@@ -345,6 +349,19 @@ test('a replacement candidate can supersede only its explicitly named previous d
   }
   assert.throws(() => mergeDraft({ track: 'internal', releases: [previous, previous] }, replacement), /refusing to overwrite/);
   assert.throws(() => mergeDraft(track, { ...replacement, replacesDraftVersionCodes: undefined }), /refusing to overwrite/);
+});
+
+test('a version bump replaces only the configured earlier draft name and version codes', () => {
+  const replacement = { versionName: '0.1.1', versionCodes: { arm: 1005, arm64: 1006 },
+    replacesDraftVersionName: '0.1.0', replacesDraftVersionCodes: [1003, 1004] };
+  const previous = { name: 'Rhenium 0.1.0', status: 'draft', versionCodes: ['1004', '1003'] };
+  const track = { track: 'internal', releases: [previous] };
+  const result = mergeDraft(track, replacement);
+  assert.deepEqual(result.releases, [{ name: 'Rhenium 0.1.1', status: 'draft', versionCodes: ['1005', '1006'] }]);
+  assert.deepEqual(mergeDraft(result, replacement), result);
+  assert.throws(() => mergeDraft(track, { ...replacement, replacesDraftVersionName: undefined }), /refusing/);
+  assert.throws(() => mergeDraft({ ...track, releases: [{ ...previous, name: 'Other' }] }, replacement), /refusing/);
+  assert.throws(() => mergeDraft({ ...track, releases: [{ ...previous, versionCodes: ['1001', '1002'] }] }, replacement), /refusing/);
 });
 
 test('Google colon-separated SHA256 certificates normalize to the APK verifier format', () => {

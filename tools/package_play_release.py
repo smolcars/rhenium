@@ -131,11 +131,22 @@ def check_manifest(xml: str, chrome_xml: str, config: dict[str, Any], arch: str)
     touch = root.find(f"uses-feature[@{ANDROID}name='android.hardware.touchscreen']")
     if touch is None or touch.get(ANDROID + "required") != "false":
         raise ValueError("Release must not require a touchscreen")
+    permissions = {item.attrib[ANDROID + "name"] for manifest in (root, chrome)
+                   for item in manifest if item.tag in ("uses-permission", "uses-permission-sdk-23")}
+    if "android.permission.FOREGROUND_SERVICE_MICROPHONE" in permissions:
+        raise ValueError("Release must not request background microphone service access")
+    if "android.permission.RECORD_AUDIO" not in permissions:
+        raise ValueError("Foreground website microphone permission must be preserved")
+    for manifest in (root, chrome):
+        for service in manifest.findall("application/service"):
+            types = service.get(ANDROID + "foregroundServiceType", "")
+            if "microphone" in types.split("|") or (types.startswith("0x") and int(types, 16) & 0x80):
+                raise ValueError("Release service still declares a microphone foreground type")
     return {
         "packageName": config["packageName"], "versionName": config["versionName"],
         "versionCode": config["versionCodes"][arch], "debuggable": False,
         "launcherModule": "chrome",
-        "permissions": sorted(item.attrib[ANDROID + "name"] for item in root.findall("uses-permission")),
+        "permissions": sorted(permissions),
     }
 
 

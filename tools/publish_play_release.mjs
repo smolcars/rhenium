@@ -10,13 +10,19 @@ import { authenticate } from './check_play_access.mjs';
 const API = 'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/';
 const UPLOAD = 'https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/';
 
+function matchesPreviousDraft(release, config) {
+  const codes = config.replacesDraftVersionCodes?.map(String).sort();
+  return release?.status === 'draft' && codes?.length === 2 &&
+    release.name === `Rhenium ${config.replacesDraftVersionName ?? config.versionName}` &&
+    JSON.stringify([...(release.versionCodes ?? [])].sort()) === JSON.stringify(codes);
+}
+
 export function mergeDraft(track, config) {
   if (!/^(?:tv:)?(?:internal|qa)$/.test(track.track)) throw new Error('Only internal testing drafts are supported.');
   const codes = Object.values(config.versionCodes).map(String).sort();
-  const previousCodes = config.replacesDraftVersionCodes?.map(String).sort();
   const drafts = (track.releases ?? []).filter(release => release.status === 'draft');
   const matches = expected => JSON.stringify([...(drafts[0]?.versionCodes ?? [])].sort()) === JSON.stringify(expected);
-  const replacesPrevious = previousCodes && drafts[0]?.name === `Rhenium ${config.versionName}` && matches(previousCodes);
+  const replacesPrevious = matchesPreviousDraft(drafts[0], config);
   if (drafts.length && (drafts.length !== 1 || (!matches(codes) && !replacesPrevious))) {
     throw new Error('The internal track already has another draft; refusing to overwrite it.');
   }
@@ -218,7 +224,7 @@ export async function submitClosed(api, config, directory) {
     const matches = release => release.name === `Rhenium ${config.versionName}` &&
       ['draft', 'completed'].includes(release.status) &&
       JSON.stringify([...(release.versionCodes ?? [])].sort()) === JSON.stringify(codes);
-    if (current.length && (current.length !== 1 || !matches(current[0]))) {
+    if (current.length && (current.length !== 1 || (!matches(current[0]) && !matchesPreviousDraft(current[0], config)))) {
       throw new Error('The closed track already has another release; refusing to overwrite it.');
     }
     const bundles = (await api.json(`${editUrl}/bundles`)).bundles ?? [];

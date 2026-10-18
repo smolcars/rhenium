@@ -38,6 +38,14 @@ def check_apk_manifest(badging: str, tree: str, config: dict[str, Any], arch: st
         raise ValueError("Downloaded APK manifest identity does not match the release")
     if "application-debuggable" in badging:
         raise ValueError("APK is debuggable")
+    permissions = set(re.findall(r"^uses-permission(?:-sdk-23)?: name='([^']+)'", badging, re.M))
+    if "android.permission.FOREGROUND_SERVICE_MICROPHONE" in permissions:
+        raise ValueError("APK still requests background microphone service access")
+    if "android.permission.RECORD_AUDIO" not in permissions:
+        raise ValueError("APK lost foreground website microphone permission")
+    for types in re.findall(r":foregroundServiceType\([^)]*\)=(0x[0-9a-fA-F]+)", tree):
+        if int(types, 16) & 0x80:
+            raise ValueError("APK service still declares a microphone foreground type")
     if '"com.pairip.licensecheck.LicenseActivity"' in tree:
         raise ValueError("Play installer-check protection blocks GitHub sideloads; obtain an unprotected Play-signed APK before publishing")
     lines = tree.splitlines()
