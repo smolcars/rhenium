@@ -22,3 +22,19 @@ The actual Home screenshot retains its background-photo attribution.
 Google's [preview asset requirements](https://support.google.com/googleplay/android-developer/answer/9866151)
 define the image dimensions, formats and screenshot requirements. Successful
 uploads do not establish policy approval or a public production release.
+
+## APK-installation permission declaration
+
+[`install-packages-declaration.txt`](install-packages-declaration.txt) is the
+paste-ready feature explanation for `REQUEST_INSTALL_PACKAGES`. Select **Web
+browsing or search** where offered and **App functionality** for usage. The
+full description in `en-US.json` also explains APK download/installation, as
+required for prominently documenting this feature. The earlier fill-missing
+listing operation preserves existing text, so this paragraph must also be added
+to the saved Play listing rather than assuming the source edit updates it.
+
+[`tests/device/install-demo`](../../tests/device/install-demo/README.md) contains
+the no-permission sample app and download webpage used for the review video.
+The actual production APK hands it to Android's installer; the recording shows
+both source approval and installation confirmation. Video evidence and public
+link are recorded in `docs/play-release.md`.

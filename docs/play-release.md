@@ -268,6 +268,48 @@ final build provenance, arguments, logs and mappings remain archived separately.
 
 ## Remaining Play Store rollout gates
 
+### APK-installation permission review — 18 October 2026
+
+The owner chose to retain `REQUEST_INSTALL_PACKAGES` for user-initiated APK
+installation. The permission is inherited from Chromium's download support and
+is present in the actual 1003/1004 manifests as `uses-permission-sdk-23`.
+[`install-packages-declaration.txt`](../release/play-listing/install-packages-declaration.txt)
+contains the feature explanation; usage is **App functionality**, and the
+permitted functionality is **Web browsing or search** where offered. The full
+description in `release/play-listing/en-US.json` now explains this feature too.
+The owner must add that paragraph to the saved Play listing: changing the source
+file does not update an existing listing, and the fill-missing helper preserves
+existing descriptions. No Play API edit was made while the owner filled forms.
+
+The [57-second captioned review video](https://github.com/smolcars/rhenium/releases/download/v0.1.0/rhenium-apk-installation-review.mp4)
+shows the production Google-signed ARM32 APK, build 1003, opening on the physical
+Android 14 Chromecast. It demonstrates visiting an APK download webpage,
+approving the download and file warning, **Downloads → Open file**, Android's
+source permission and installation confirmation, then opening the installed
+test app. Android records `com.nitesh.rhenium` as the originating package and
+`com.google.android.packageinstaller` as the installer. The separate, locally
+served [sample APK](../tests/device/install-demo/README.md) requests no permissions
+and is not included in Rhenium's APK or AAB.
+
+The continuous take is 52.7 seconds; scaling, captions below the actual UI, and a
+four-second final-frame hold produce a 56.7-second H.264 MP4 (2,784,662 bytes).
+There are no middle cuts, speed changes, reconstructed screens or voice-over.
+The public GitHub asset was downloaded without authentication and its SHA-256
+matched `746d56da507481b364bc121a03bb81ee61976a3f6f65f919ff0b64e05615c41a`.
+Google [accepts cloud links to MP4 demonstrations](https://support.google.com/googleplay/android-developer/answer/9214102?hl=en).
+Approval is determined by Google's permission review; preparing this evidence
+does not submit or accept the owner's declaration.
+
+The installed browser's SHA-256 matched the published ARM32 APK. After capture,
+the sample app and downloaded file were removed, Downloads was empty, normal
+Home was restored, and the original installation-source mode (`default`) was
+restored. The owned fixture server, ADB reverse and agent-device session were
+closed. The original browser data and installed release were preserved. Raw
+takes, captions, per-step snapshots and verification remain under
+`~/.cache/brave-tv/evidence/install-permission-video-20261018/`.
+
+### Closed testing and production access
+
 The owner has authorized submitting the existing 0.1.0 builds to closed testing.
 Run `play-release.yml` on `master` with `operation=closed`. It downloads the
 public release's validation reports, matches both uploaded bundle hashes and

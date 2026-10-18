@@ -30,6 +30,8 @@ sites, switch tabs and browse pages using the D-pad. A pointer is a long press a
   excluded from private Home.
 - **Your browser essentials.** Tabs, favorites, history, downloads, page controls,
   Shields and settings in a menu built for TV navigation.
+- **APK downloads.** Download APK files from websites and open them in Android's
+  package installer, with your approval for installation.
 - **A phone remote.** Pair through the Phone icon on Home to enter text and
   control browsing from your phone's browser, with approval on the TV.
 - **A few familiar starting points.** YouTube, Netflix, Prime Video and Twitch
