@@ -268,6 +268,48 @@ final build provenance, arguments, logs and mappings remain archived separately.
 
 ## Remaining Play Store rollout gates
 
+### Console setup on 18 October 2026
+
+All 11 Dashboard app-information/store-listing tasks are now complete. Saved
+changes include the public [privacy policy](privacy-policy.md), no in-app ads,
+non-government status, a 13-and-older target audience, Communication category,
+and a completed Data safety form. The content-rating questionnaire declares a
+web browser with unrestricted internet access; its generated ratings include
+ESRB Everyone and PEGI 3. The owner explicitly approved the IARC terms before
+they were accepted.
+
+The listing reuses the existing real TV Home/menu captures in the general
+phone-screenshot gallery because Console requires two phone or tablet images
+even with TV images present. These are unchanged TV captures and do not establish
+phone compatibility. The icon, feature graphic and TV banner are declared as
+AI-assisted assets; the real screenshots remain unaltered captures. Android TV
+was added and opted in for review using the existing shared release track.
+Closed Alpha targets all 177 selectable countries/regions plus rest of world.
+These changes are saved in Publishing overview, not submitted or approved.
+
+The existing Alpha release still contains codes **1003 / 1004**. Its Console
+preview reports three blocking declarations:
+
+- `QUERY_ALL_PACKAGES`, for installed-app matching when opening links/files.
+- `REQUEST_INSTALL_PACKAGES`, for user-requested downloaded APK installation.
+- Foreground services: `DATA_SYNC`, `MEDIA_PLAYBACK` and `MICROPHONE`.
+
+The package visibility and installer forms require real demonstration-video
+links before Save is enabled. The APK-installation video is now available in
+the following section. Foreground services also require video links for the
+selected features. No placeholder video or unsupported declaration was
+submitted. Supply accessible recordings showing the actual shipped behavior,
+or remove unneeded permissions/services and build replacement bundles. Removing
+only package visibility/installation permissions does not remove the evidence
+requirement for retained foreground services.
+
+Publishing overview's **Send app for review** remains disabled. The owner is
+still gathering testers; no tester list or group has been configured. The
+Dashboard reports **0 opted-in testers** and requires 12 continuously opted in
+for 14 days before production access. Release preview also warns that Java
+deobfuscation mappings and native debug symbols have not been uploaded. No new
+binary was built or uploaded during this Console setup.
+
 ### APK-installation permission review — 18 October 2026
 
 The owner chose to retain `REQUEST_INSTALL_PACKAGES` for user-initiated APK
