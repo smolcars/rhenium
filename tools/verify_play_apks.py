@@ -65,7 +65,7 @@ def verify(sdk: Path, directory: Path) -> list[dict[str, Any]]:
         signatures = subprocess.check_output([str(tools / "apksigner"), "verify", "--print-certs", str(apk)], text=True)
         actual = re.findall(r"^Signer #\d+ certificate SHA-256 digest: ([a-fA-F0-9]+)$", signatures, re.M)
         if [value.lower() for value in actual] != [certificate]:
-            raise ValueError("APK signer does not match the certificate returned by Google Play")
+            raise ValueError(f"APK signer does not match Google Play certificate {certificate}. Public certificate report:\n{signatures}")
         alignment = ["-P", "16"] if arch == "arm64" else []
         subprocess.run([str(tools / "zipalign"), "-c", *alignment, "4", str(apk)], check=True)
         badging = subprocess.check_output([str(tools / "aapt2"), "dump", "badging", str(apk)], text=True)
