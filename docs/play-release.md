@@ -6,8 +6,9 @@
 as a GitHub prerelease, with Google Play-signed ARM32/ARM64 APKs, signed AABs,
 checksums, static verification and physical ARM32 runtime results. Final codes
 are **1003 / 1004**. The APKs allow sideloading and share Google's app-signing
-identity with Play. The Play release remains an **internal draft**; no production
-rollout or owner legal agreement was performed.
+identity with Play. Play has **internal and closed-testing drafts**; the first
+closed-testing submission still requires Play Console. No production rollout or
+owner legal agreement was performed.
 
 ## Engineering plan — 17 October 2026
 
@@ -287,6 +288,19 @@ The tester API exposes Google Groups but not individual email lists; a zero grou
 count does not prove that no email-list testers are configured. Closed testing
 still requires actual tester opt-in and use; submission does not start the
 14-day period by itself.
+
+The [closed-testing preparation run](https://github.com/smolcars/rhenium/actions/runs/39090323930)
+saved `Rhenium 0.1.0` on `alpha` with codes **1003 / 1004** and independently
+confirmed `RELEASE_LIFECYCLE_STATE_DRAFT`. Its failure status deliberately reports
+that submission remains unfinished; the draft commit and lifecycle check passed.
+The owner confirmed that testers have not been configured. In Play Console,
+open **Test and release → Testing → Closed testing → Alpha → Manage track**,
+configure the tester email list or Google Group on **Testers**, then edit the
+existing release and complete the review/submission flow. Do not upload the
+bundles again. Use Publishing overview to send changes for review if prompted.
+The first publication and tester setup are still owner actions; no approval or
+tester availability has been claimed. The [tester setup guide](https://support.google.com/googleplay/android-developer/answer/9845334?hl=en)
+explains the email-list and Google Group options.
 
 Run `play-release.yml` with `operation=preflight` to test the already uploaded
 bundle codes as a production candidate inside a temporary Play edit. It reports
