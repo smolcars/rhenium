@@ -69,6 +69,37 @@ and their version codes must remain unchanged.
    audit. Require the physical checker to pass, then record a fresh review clip.
 
 No production browser source, feature flag, build, Play track, or declaration
-was changed while collecting this evidence. Implementation and replacement
-build verification follow this evidence collection. The current microphone
-declaration remains unresolved until the retained Play bundles are replaced.
+was changed during the original evidence collection. The owner-approved
+replacement was implemented and verified afterward, as recorded below.
+
+## Verified 0.1.1 replacement — 18 October 2026
+
+Brave source `d29273ea6c5949cf82e8cc32e3bff9b869b4ff38`, root build source
+`9a764c7b4e3ed3965bfb5a107a8d5c5958202783`. The manifest patches remove the
+microphone permission/type; `BraveForegroundServiceUtils` no longer adds that
+type. The generic experimental capture service also checks whether the manifest
+permission is granted before enabling background capture, preventing a flag from
+requesting an undeclared type.
+
+ARM64 compiled in 5m07.08s and ARM32 in 3m42.25s, including blocking Android
+analysis. Both signed bundles and independently checked Google Play-signed APKs
+retain `RECORD_AUDIO`, omit the microphone foreground permission/type, and pass
+ABI, signing and alignment guards. The final ARM32 Google-signed release passed
+real website/Android permission prompts and unsilenced foreground microphone
+capture on the Android 14 Chromecast. Capture was stopped and the original
+microphone grant, flags and app-op modes were restored.
+
+App handoff, background download with a user-initiated Android 14 job, background
+mediaPlayback service, native Home/remote navigation, Shields off/on and a manual
+signed-filter recheck also passed. Fresh captioned videos are linked in the
+[remaining declarations](../release/play-listing/remaining-permissions-declarations.md).
+The historical background-capture checker remains a diagnostic for the old
+capability; foreground-only 0.1.1 deliberately does not satisfy it.
+
+Both Play drafts now contain **1005 / 1006**. Google confirmed the closed release
+is `RELEASE_LIFECYCLE_STATE_DRAFT` and requires the first Console submission.
+The remaining package-visibility/dataSync/mediaPlayback forms use the new clips;
+Microphone should be unselected in the foreground-service declaration. The saved
+APK-installation declaration/video remain applicable. No production rollout or
+owner legal agreement was performed. ARM64 hardware and 16 KB runtime remain
+unverified; their static checks passed.

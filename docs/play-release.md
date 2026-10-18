@@ -1,14 +1,54 @@
 # Google Play release preparation
 
-## Published prerelease
+## Published prerelease — 0.1.1
 
-[Rhenium 0.1.0](https://github.com/smolcars/rhenium/releases/tag/v0.1.0) is public
-as a GitHub prerelease, with Google Play-signed ARM32/ARM64 APKs, signed AABs,
-checksums, static verification and physical ARM32 runtime results. Final codes
-are **1003 / 1004**. The APKs allow sideloading and share Google's app-signing
-identity with Play. Play has **internal and closed-testing drafts**; the first
-closed-testing submission still requires Play Console. No production rollout or
-owner legal agreement was performed.
+[Rhenium 0.1.1](https://github.com/smolcars/rhenium/releases/tag/v0.1.1) contains
+Google Play-signed ARM32/ARM64 APKs and signed AABs, codes **1005 / 1006**.
+It removes the unused `FOREGROUND_SERVICE_MICROPHONE` permission, microphone
+foreground-service types and the runtime type addition. An explicit permission
+guard also prevents experimental background capture from requesting that type.
+`RECORD_AUDIO` remains; website microphone access works while Rhenium is open.
+Background microphone capture is unsupported.
+
+Build root `9a764c7b4e3ed3965bfb5a107a8d5c5958202783`, Brave source
+`d29273ea6c5949cf82e8cc32e3bff9b869b4ff38`. Both incremental builds passed blocking
+Android analysis: ARM64 **5m07.08s**, ARM32 **3m42.25s**. Bundle and Play-APK guards
+verify the removed permission/type, retained `RECORD_AUDIO`, package/version,
+Google signing identity, TV launcher, ABI and ELF/ZIP alignment. Both public APKs
+use the existing Google Play key; local upload-key test install sets remain private.
+
+The physical Android 14 ARM32 Chromecast passed native Home/remote navigation,
+foreground microphone access with real website and Android permission prompts,
+unsilenced capture and stop, app-link handoff, background download/checksum,
+background mediaPlayback service/pause, Shields off/on and a manual signed-filter
+recheck. The update required `pm uninstall -k` after insufficient storage; data
+inode **82184** and all profile install states were preserved. Test tabs/files,
+fixture app, microphone grant/flags/app-op modes, ADB routes and automation session
+were cleaned up; normal Rhenium Home was restored. ARM64 hardware, 16 KB runtime
+and broad streaming/DRM compatibility remain unverified.
+
+[Stage](https://github.com/smolcars/rhenium/actions/runs/39151332839) and
+[signed-APK retrieval](https://github.com/smolcars/rhenium/actions/runs/39151590908)
+passed. The [closed-track operation](https://github.com/smolcars/rhenium/actions/runs/39152182340)
+saved **1005 / 1006** and confirmed `RELEASE_LIFECYCLE_STATE_DRAFT`, then reported
+that Google requires the first submission in Console. Its failure result records
+that owner action; it is not a compilation failure or a submitted review. Both
+internal and closed drafts contain the replacement codes. No production rollout
+or owner legal agreement was performed.
+
+Fresh captioned 0.1.1 videos and paste-ready answers are in
+[remaining permission declarations](../release/play-listing/remaining-permissions-declarations.md).
+Refresh that draft's foreground-service declaration and leave Microphone
+unselected. The saved APK-installation declaration/video remain applicable.
+Archive: `~/.cache/brave-tv/artifacts/rhenium-0.1.1-play/`; detailed evidence:
+`~/.cache/brave-tv/evidence/play-release-0.1.1-20261018-r1/`.
+
+## 0.1.0 release history
+
+[Rhenium 0.1.0](https://github.com/smolcars/rhenium/releases/tag/v0.1.0) remains
+public and unchanged, codes **1003 / 1004**, with its original Google-signed APKs,
+AABs, checksums and validation records. The sections below record that release's
+original build and publishing work; current draft codes and downloads are above.
 
 ## Engineering plan — 17 October 2026
 
@@ -29,8 +69,8 @@ or replace the installed development app.
    targets each contain one browser ABI. Use consecutive version codes in one
    release, with the ARM64 code higher so capable devices receive it. Do not
    combine independently generated native libraries or V8 snapshots by hand.
-   First candidate: version `0.1.0`, codes `1001`/`1002`. The replacement uses
-   codes `1003`/`1004` in
+   First candidate: version `0.1.0`, codes `1001`/`1002`. Its installer-protection
+   replacement used `1003`/`1004`. Current release codes are in
    [android.json](../release/android.json).
 3. Generate an independent upload key outside the repository. Keep its password
    and keystore private and back them up in GitHub Actions secrets. Sign archived

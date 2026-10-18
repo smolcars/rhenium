@@ -54,29 +54,31 @@ The menu also exposes **Jump between elements** and **Browse page**.
 
 ## Get started
 
-Rhenium **0.1.0** is available as a [prerelease](https://github.com/smolcars/rhenium/releases/tag/v0.1.0)
+Rhenium **0.1.1** is available as a [prerelease](https://github.com/smolcars/rhenium/releases/tag/v0.1.1)
 for Android TV and Google TV. The APKs declare Android 10 (API 29) as their minimum;
 physical release testing used Android 14.
 
 | Android system ABI | Download |
 | --- | --- |
-| 32-bit ARM (`armeabi-v7a`) | [ARM32 APK](https://github.com/smolcars/rhenium/releases/download/v0.1.0/rhenium-0.1.0-arm.apk) |
-| 64-bit ARM (`arm64-v8a`) | [ARM64 APK](https://github.com/smolcars/rhenium/releases/download/v0.1.0/rhenium-0.1.0-arm64.apk) |
+| 32-bit ARM (`armeabi-v7a`) | [ARM32 APK](https://github.com/smolcars/rhenium/releases/download/v0.1.1/rhenium-0.1.1-arm.apk) |
+| 64-bit ARM (`arm64-v8a`) | [ARM64 APK](https://github.com/smolcars/rhenium/releases/download/v0.1.1/rhenium-0.1.1-arm64.apk) |
 
 Choose your TV's Android system ABI; a 64-bit processor can run a 32-bit system.
 Both APKs use the Google Play app-signing identity. The release includes
-[SHA-256 checksums](https://github.com/smolcars/rhenium/releases/download/v0.1.0/SHA256SUMS)
+[SHA-256 checksums](https://github.com/smolcars/rhenium/releases/download/v0.1.1/SHA256SUMS)
 and verification records. The Play Store listing is not publicly available yet.
 
-The ARM32 release has passed launch, native Home/search, Shields on/off,
-cosmetic/scriptlet and signed-filter update checks on an Android 14 Chromecast.
+The ARM32 release has passed launch, native Home and remote navigation, foreground
+website microphone access, background downloads/playback, Shields on/off and a
+signed-filter update check on an Android 14 Chromecast.
 An Android 16 x86-64 emulator is used for development. ARM64 hardware, 16 KB
-runtime and broader streaming/DRM compatibility remain unverified.
+runtime and broader streaming/DRM compatibility remain unverified. Website
+microphones work while Rhenium is open; background microphone capture is unsupported.
 
 For a TV already paired with ADB, replace `DEVICE_SERIAL` and the APK path:
 
 ```sh
-adb -s DEVICE_SERIAL install -r --user 0 /path/to/rhenium-0.1.0-arm.apk
+adb -s DEVICE_SERIAL install -r --user 0 /path/to/rhenium-0.1.1-arm.apk
 ```
 
 Open **Rhenium** from your TV's app list. Release builds use

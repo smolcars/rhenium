@@ -10,7 +10,8 @@ behavior into its pages, or grant permissions through a test interface.
   counts MediaRecorder chunks. It discards audio chunks; no audio is saved or
   uploaded. **Increasing counters do not prove unsilenced background capture.**
   This page exposed Android silencing in release 1003 and is not microphone FGS
-  review evidence.
+  review evidence. In 0.1.1 it verifies foreground website capture only; the
+  microphone foreground-service permission/type have been removed.
 
 Create an external evidence directory, generate a test tone, and start the
 loopback-only server:

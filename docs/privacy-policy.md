@@ -89,10 +89,12 @@ project does not collect or upload your installed-app inventory. If you download
 an APK and choose to open it, Android controls installation and any permission
 to install apps from this source. Rhenium does not silently install apps.
 
-Foreground services can keep user-requested downloads, media playback or a
-website's permitted microphone session running while you use another app.
-Android notifications and permissions govern these activities. Microphone
-content you authorize a website to use is handled by that website.
+Foreground services or user-initiated jobs can keep user-requested downloads
+and media playback running while you use another app. Android notifications
+and permissions govern these activities. Websites can request microphone
+access while Rhenium is open; microphone content you authorize a website to
+use is handled by that website. Rhenium 0.1.1 does not support background
+microphone capture.
 
 ## Support and information you send us
 
