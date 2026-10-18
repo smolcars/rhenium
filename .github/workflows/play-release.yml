@@ -4,13 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Stage an internal draft, or download its Play-signed APKs
+        description: Stage a draft, retrieve signed APKs, or validate production without publishing
         type: choice
         required: true
         default: stage
         options:
           - stage
           - download
+          - preflight
 
 permissions:
   contents: write
@@ -53,6 +54,11 @@ jobs:
         env:
           GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
         run: node tools/publish_play_release.mjs stage candidate
+      - name: Validate production in a temporary edit without publishing
+        if: inputs.operation == 'preflight'
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: node tools/publish_play_release.mjs preflight
       - name: Retrieve Play-signed APKs
         if: inputs.operation == 'download'
         env:

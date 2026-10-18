@@ -1,4 +1,4 @@
-// Stage internal drafts and retrieve Play-signed APKs. Never roll out a track.
+// Stage internal drafts, retrieve signed APKs, or validate without publishing.
 import { createHash } from 'node:crypto';
 import { createReadStream, createWriteStream, readFileSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -148,6 +148,39 @@ export async function stage(api, config, directory) {
   }
 }
 
+export async function preflight(api, config) {
+  const base = `${API}${encodeURIComponent(config.packageName)}/edits`;
+  const edit = await api.json(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  if (!edit.id) throw new Error('Play returned no edit ID.');
+  const editUrl = `${base}/${encodeURIComponent(edit.id)}`;
+  try {
+    const tracks = (await api.json(`${editUrl}/tracks`)).tracks ?? [];
+    const track = ['tv:production', 'production'].map(name => tracks.find(item => item.track === name)).find(Boolean);
+    if (!track || track.releases?.length) throw new Error('Preflight requires an empty production track; no existing release will be replaced.');
+    const codes = Object.values(config.versionCodes).map(String).sort();
+    const bundles = (await api.json(`${editUrl}/bundles`)).bundles ?? [];
+    if (!codes.every(code => bundles.some(bundle => String(bundle.versionCode) === code))) {
+      throw new Error('The release bundles are not already uploaded; preflight never uploads new binaries.');
+    }
+    const listings = (await api.json(`${editUrl}/listings`)).listings ?? [];
+    console.log(JSON.stringify({ packageName: config.packageName, track: track.track, versionCodes: codes,
+      storeListings: listings.map(item => ({ language: item.language, titlePresent: Boolean(item.title),
+        shortDescriptionPresent: Boolean(item.shortDescription), fullDescriptionPresent: Boolean(item.fullDescription) })) }, null, 2));
+    // This status exists only inside the temporary edit. Never call commit here.
+    await api.json(`${editUrl}/tracks/${encodeURIComponent(track.track)}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        track: track.track, releases: [{ name: `Rhenium ${config.versionName}`, versionCodes: codes, status: 'completed' }],
+      }),
+    });
+    await api.json(`${editUrl}:validate`, { method: 'POST' });
+    console.log('Production candidate passed API validation. This is not policy approval or publication.');
+  } finally {
+    const discarded = await api.request(editUrl, { method: 'DELETE' });
+    if (!discarded.ok && discarded.status !== 404) throw new Error(`Preflight edit cleanup failed (HTTP ${discarded.status}).`);
+    console.log('Preflight edit discarded; no release was published or submitted for review.');
+  }
+}
+
 async function download(api, config, directory) {
   mkdirSync(directory, { recursive: true });
   const base = `${API}${encodeURIComponent(config.packageName)}/generatedApks`;
@@ -184,14 +217,16 @@ async function download(api, config, directory) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const [operation, directory] = process.argv.slice(2);
-    if (!['stage', 'download'].includes(operation) || !directory) throw new Error('Usage: publish_play_release.mjs stage|download DIRECTORY');
+    if (!['stage', 'download', 'preflight'].includes(operation) || (operation !== 'preflight' && !directory)) {
+      throw new Error('Usage: publish_play_release.mjs stage|download DIRECTORY, or preflight');
+    }
     let credentials;
     try { credentials = JSON.parse(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON ?? '{}'); }
     catch { throw new Error('The service-account secret is not valid JSON.'); }
     delete process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
     const config = JSON.parse(readFileSync(new URL('../release/android.json', import.meta.url), 'utf8'));
     const api = client(await authenticate(credentials));
-    await (operation === 'stage' ? stage : download)(api, config, directory);
+    await ({ stage, download, preflight }[operation])(api, config, directory);
   } catch (error) {
     console.error(error instanceof Error ? error.message : 'Play operation failed.');
     process.exitCode = 1;

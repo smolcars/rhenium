@@ -4,9 +4,44 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { mergeDraft, selectUniversalApks, stage } from '../tools/publish_play_release.mjs';
+import { mergeDraft, selectUniversalApks, stage, preflight } from '../tools/publish_play_release.mjs';
 
 const config = { versionName: '0.1.0', versionCodes: { arm: 1001, arm64: 1002 } };
+
+test('production preflight validates only a temporary edit and discards it even on rejection', async () => {
+  for (const rejected of [false, true]) {
+    const requests = [];
+    const api = {
+      json: async (url, options = {}) => {
+        const path = new URL(url).pathname;
+        requests.push([options.method ?? 'GET', path]);
+        assert.ok(!path.includes(':commit'), 'Preflight must never commit');
+        if (path.endsWith('/edits')) return { id: 'preflight' };
+        if (path.endsWith('/tracks')) return { tracks: [{ track: 'production', releases: [] }] };
+        if (path.endsWith('/bundles')) return { bundles: [{ versionCode: 1001 }, { versionCode: 1002 }] };
+        if (path.endsWith('/listings')) return { listings: [] };
+        if (path.endsWith('/tracks/production')) {
+          assert.equal(options.method, 'PUT');
+          assert.deepEqual(JSON.parse(options.body).releases, [{ name: 'Rhenium 0.1.0',
+            versionCodes: ['1001', '1002'], status: 'completed' }]);
+          if (rejected) throw new Error('Only releases with status draft may be created on draft app.');
+          return {};
+        }
+        if (path.endsWith(':validate')) return {};
+        assert.fail(`Unexpected preflight request: ${url}`);
+      },
+      request: async (url, options) => {
+        requests.push([options.method, new URL(url).pathname]);
+        assert.equal(options.method, 'DELETE');
+        return { ok: true };
+      },
+    };
+    if (rejected) await assert.rejects(preflight(api, { ...config, packageName: 'com.nitesh.rhenium' }), /draft app/);
+    else await preflight(api, { ...config, packageName: 'com.nitesh.rhenium' });
+    assert.equal(requests.at(-1)[0], 'DELETE');
+    assert.equal(requests.some(([, path]) => path.endsWith(':validate')), !rejected);
+  }
+});
 
 test('a new internal draft commits without the rejected-changes option and verifies its lifecycle', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'rhenium-play-draft-'));

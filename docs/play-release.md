@@ -267,6 +267,13 @@ final build provenance, arguments, logs and mappings remain archived separately.
 
 ## Remaining Play Store rollout gates
 
+Run `play-release.yml` with `operation=preflight` to test the already uploaded
+bundle codes as a production candidate inside a temporary Play edit. It reports
+store-listing field presence, calls Google's validation endpoint, and always
+discards the edit. It never commits, uploads binaries, submits for review or
+publishes. A successful validation is not policy approval. This follows Google's
+[transactional edits model](https://developers.google.com/android-publisher/edits).
+
 Successful compilation is not a claim of Play approval. Before a public rollout,
 complete the privacy policy, Data safety and permission declarations, listing
 assets, TV distribution setup, and signing-key backup. Resolve the existing phone
