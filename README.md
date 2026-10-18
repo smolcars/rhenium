@@ -59,7 +59,10 @@ streaming playback, DRM compatibility and release packaging are still being test
 
 **There is no public browser APK release yet.** The assets currently on the
 [Releases page](https://github.com/smolcars/rhenium/releases) are signed filter
-snapshots. To try the browser now, build a matching APK using the instructions below.
+snapshots. The 0.1.0 ARM32 and ARM64 bundles are built and saved as an internal
+Play draft. GitHub APK publication is held while Play's installer check is
+configured for sideloading; see the [release status](docs/play-release.md#current-publication-blocker).
+To try the browser now, build a matching APK using the instructions below.
 
 For a TV already paired with ADB, replace `DEVICE_SERIAL` and the APK path:
 

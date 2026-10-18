@@ -96,8 +96,9 @@ access succeed, and the temporary edit is discarded. The first inspection found
 no uploaded bundles, APKs or releases. GitHub Actions also restored the encrypted
 keystore backup and verified its public certificate fingerprint successfully.
 The ARM32 and ARM64 bundles are built, signed and statically validated. Physical
-ARM32 release acceptance passed on the Android 14 Chromecast; final Play-signed
-APK acceptance is pending the publishing workflow.
+ARM32 release acceptance passed on the Android 14 Chromecast. Play-signed APKs
+passed cryptographic and static checks, but failed sideload runtime acceptance
+because Google added its installer check (details below).
 
 The [publishing workflow](../.github/workflows/play-release.yml) is manual. Its
 `stage` operation downloads the candidate AABs and validation reports from the
@@ -165,6 +166,55 @@ flow, Google's exact parameter rejection, and rejection of an in-review result.
 The rerun and final Play-signed APK checks must pass before public release.
 See [commit parameters](https://developers.google.com/android-publisher/api-ref/rest/v3/edits/commit)
 and [release lifecycle states](https://developers.google.com/android-publisher/api-ref/rest/v3/applications.tracks.releases).
+
+The [corrected staging run](https://github.com/smolcars/rhenium/actions/runs/39082959826)
+saved codes 1001 and 1002 on `internal`, and independently confirmed lifecycle
+`RELEASE_LIFECYCLE_STATE_DRAFT`. No production rollout was requested.
+Google's certificate fingerprints use colon-separated bytes; the helper now
+strictly normalizes that representation to the lowercase hex used by apksigner.
+SDK 37's hybrid signature reports also require Java 25 and use `V3.0 Signer`
+labels alongside the Android 17 classical/PQC signers. The verifier checks the
+API-pinned classical certificate and requires identical full signing identities
+across ARM32 and ARM64. Captured-response regressions cover both formats.
+
+## Current publication blocker
+
+The [Play download run](https://github.com/smolcars/rhenium/actions/runs/39083512879)
+retrieved both universal APKs and passed signatures, package/version, TV launcher,
+native ABI and alignment checks. Local SDK 37/JDK 25 verification also passed.
+However, two physical TV launches of the ARM32 APK redirected to Google Play
+and exited. App-only logs report `Local install check failed due to wrong
+installer`; the generated manifest contains
+`com.pairip.licensecheck.LicenseActivity` and a Play-added application wrapper.
+Those components are absent from the submitted browser bundle.
+
+Both APKs are signed by Google's classical app-signing certificate
+`e1f1153df5390326ff766f1fccd176ff7e5d1d5074176fcb1bcab9999c09034b`, with
+matching Android 17 hybrid signing identities. The downloaded universal APKs
+declare minimum SDK 29; the earlier device-specific test variants used SDK 32.
+Neither signature validation nor a successful AAB smoke test establishes that
+the Play-added installer check will allow GitHub installs.
+
+The [availability check](https://github.com/smolcars/rhenium/actions/runs/39083874584)
+found 160 unprotected splits per architecture and **no unprotected standalone
+APKs**. The available universal APKs still contain the installer check. Their
+hashes and failure evidence are preserved locally under
+`play-signed-protected/`; the protected APKs and their download records were
+removed from the private GitHub draft. The current verifier rejects that
+licensing activity before attaching GitHub downloads. It does not modify signed
+APKs or simulate installation by Google Play.
+
+Owner action: in [Play Console](https://play.google.com/console/), select Rhenium,
+then **App integrity → Automatic protection / Installer check** and turn off
+**Require installation from Google Play**, or use **Turn off protection for this
+release** in the internal draft. Save the change. Google's
+[installer-check guide](https://support.google.com/googleplay/android-developer/answer/15621622?hl=en)
+and [unprotected-distribution guidance](https://support.google.com/googleplay/android-developer/answer/10183279?hl=en-GB)
+describe these controls. Once an unprotected single-file distribution APK is
+available, rerun `download`, validate both APKs, test the ARM32 APK on the TV,
+then publish the authorized GitHub prerelease and replace the README's pending
+download status. Keep the existing source/build caches and version codes unless
+Google actually requires a new upload; do not start a full rebuild speculatively.
 
 ## Public-release gates
 
