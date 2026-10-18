@@ -52,26 +52,35 @@ The menu also exposes **Jump between elements** and **Browse page**.
 
 ## Get started
 
-Rhenium is in active development. Current builds have been exercised on a
-Google Chromecast with Google TV running Android 14 (32-bit ARM) and an
-Android TV emulator running Android 16 (x86-64). Broader device coverage,
-streaming playback, DRM compatibility and release packaging are still being tested.
+Rhenium **0.1.0** is available as a [prerelease](https://github.com/smolcars/rhenium/releases/tag/v0.1.0)
+for Android TV and Google TV. The APKs declare Android 10 (API 29) as their minimum;
+physical release testing used Android 14.
 
-**There is no public browser APK release yet.** The assets currently on the
-[Releases page](https://github.com/smolcars/rhenium/releases) are signed filter
-snapshots. The 0.1.0 ARM32 and ARM64 bundles are built and saved as an internal
-Play draft. GitHub APK publication is held while Play's installer check is
-configured for sideloading; see the [release status](docs/play-release.md#current-publication-blocker).
-To try the browser now, build a matching APK using the instructions below.
+| Android system ABI | Download |
+| --- | --- |
+| 32-bit ARM (`armeabi-v7a`) | [ARM32 APK](https://github.com/smolcars/rhenium/releases/download/v0.1.0/rhenium-0.1.0-arm.apk) |
+| 64-bit ARM (`arm64-v8a`) | [ARM64 APK](https://github.com/smolcars/rhenium/releases/download/v0.1.0/rhenium-0.1.0-arm64.apk) |
+
+Choose your TV's Android system ABI; a 64-bit processor can run a 32-bit system.
+Both APKs use the Google Play app-signing identity. The release includes
+[SHA-256 checksums](https://github.com/smolcars/rhenium/releases/download/v0.1.0/SHA256SUMS)
+and verification records. The Play Store listing is not publicly available yet.
+
+The ARM32 release has passed launch, native Home/search, Shields on/off,
+cosmetic/scriptlet and signed-filter update checks on an Android 14 Chromecast.
+An Android 16 x86-64 emulator is used for development. ARM64 hardware, 16 KB
+runtime and broader streaming/DRM compatibility remain unverified.
 
 For a TV already paired with ADB, replace `DEVICE_SERIAL` and the APK path:
 
 ```sh
-adb -s DEVICE_SERIAL install -r /path/to/BraveMonoarm.apk
+adb -s DEVICE_SERIAL install -r --user 0 /path/to/rhenium-0.1.0-arm.apk
 ```
 
-Open **Rhenium** from your TV's app list. Build outputs and the development
-package ID (`com.brave.browser_default`) retain their existing internal names.
+Open **Rhenium** from your TV's app list. Release builds use
+`com.nitesh.rhenium`; earlier `com.brave.browser_default` development installs
+are separate apps and their browser data is not automatically migrated.
+Development build outputs retain their existing internal filenames.
 
 ### Connect your phone
 

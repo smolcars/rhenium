@@ -1,5 +1,14 @@
 # Google Play release preparation
 
+## Published prerelease
+
+[Rhenium 0.1.0](https://github.com/smolcars/rhenium/releases/tag/v0.1.0) is public
+as a GitHub prerelease, with Google Play-signed ARM32/ARM64 APKs, signed AABs,
+checksums, static verification and physical ARM32 runtime results. Final codes
+are **1003 / 1004**. The APKs allow sideloading and share Google's app-signing
+identity with Play. The Play release remains an **internal draft**; no production
+rollout or owner legal agreement was performed.
+
 ## Engineering plan — 17 October 2026
 
 Prepare the user's approved package `com.nitesh.rhenium` from the committed
@@ -50,14 +59,15 @@ Run inside the project's Nix environment:
 
 ```sh
 python3 tools/build_play_release.py "$HOME/.cache/brave-tv/workspace" \
-  "$HOME/.cache/brave-tv/evidence/play-release-20261017-r10"
+  "$HOME/.cache/brave-tv/evidence/play-release-20261017-r11"
 python3 tools/package_play_release.py "$HOME/.cache/brave-tv/workspace" \
   "$HOME/.local/share/rhenium/signing" \
-  --archive "$HOME/.cache/brave-tv/artifacts/rhenium-0.1.0-play"
+  --archive "$HOME/.cache/brave-tv/artifacts/rhenium-0.1.0-play-unprotected"
 ```
 
-Both release builds and signing completed successfully in
-`rhenium-play-release-r10.service`. It used eight local/total Siso steps, ten
+The original release builds and signing completed successfully in
+`rhenium-play-release-r10.service`; the final incremental refresh and signing
+completed in `rhenium-play-release-r11.service`. Both used eight local/total Siso steps, ten
 allowed CPUs, and 20/22 GiB soft/hard memory limits. Earlier setup
 attempts stopped during GN generation without compiling a browser. No existing
 Debug/Static output was removed. Native symbols use level zero to fit this
@@ -76,7 +86,10 @@ the feature module. This keeps APK and bundle startup behavior consistent;
 the isolated-split validation remains enabled. The saved packaging command
 reproduced this exact failure before the source correction. Both final builds
 passed the isolated-split check after this correction. ARM32 started automatically after
-ARM64 and completed in 2 hours 55 minutes.
+ARM64 and completed in 2 hours 55 minutes. After disabling Google's installer
+check, refreshing the build codes required only 50 incremental steps per ABI:
+3 minutes 16 seconds for ARM64 and 3 minutes 7 seconds for ARM32. All native
+library bytes match the original validated candidate; no clean build was needed.
 The archive validator reads release metadata from the base manifest and the TV
 launcher from the install-time `chrome` module, where Chromium places activities.
 It checks that both manifests have the release package and that the exported TV
@@ -98,8 +111,10 @@ no uploaded bundles, APKs or releases. GitHub Actions also restored the encrypte
 keystore backup and verified its public certificate fingerprint successfully.
 The ARM32 and ARM64 bundles are built, signed and statically validated. Physical
 ARM32 release acceptance passed on the Android 14 Chromecast. Play-signed APKs
-passed cryptographic and static checks, but failed sideload runtime acceptance
-because Google added its installer check (details below).
+from the original candidate passed cryptographic and static checks but failed
+sideload runtime acceptance because Google added its installer check. The final
+fresh-upload APKs passed both static checks and physical ARM32 runtime acceptance
+with that check disabled (details below).
 
 The [publishing workflow](../.github/workflows/play-release.yml) is manual. Its
 `stage` operation downloads the candidate AABs and validation reports from the
@@ -136,7 +151,9 @@ component-update feed.
 
 ## Validated candidate artifacts
 
-The local archive is `~/.cache/brave-tv/artifacts/rhenium-0.1.0-play/`. It contains
+The final archive is `~/.cache/brave-tv/artifacts/rhenium-0.1.0-play-unprotected/`.
+The original `~/.cache/brave-tv/artifacts/rhenium-0.1.0-play/` remains preserved,
+including the rejected protected downloads. The final archive contains
 both signed AABs, validation reports, exported manifests, separate R8 mappings,
 build logs and arguments, source revisions, download sizes and physical-test
 evidence. Private signing credentials are stored separately. Local `.apks` files
@@ -144,8 +161,8 @@ use the upload key for testing; they are not final public downloads.
 
 | Bundle | Version code | SHA-256 |
 | --- | --- | --- |
-| ARM32 | 1001 | `04200f27b5edb9380ff499ee13d2eafeba25814b82954084b974676a208f943c` |
-| ARM64 | 1002 | `5ead0e626efda8b24e7a673e03e1daba2af3eebc80219f12e3aa799fcc2eb07d` |
+| ARM32 | 1003 | `f7742de7cf080e2e3cd0abab0f18f49f0b469857685dad2c8c77cb9ecaf9fe4a` |
+| ARM64 | 1004 | `839039a29200d30ccf94572f045918aeaa5170ed85bb97b30d513f1ba4347d0b` |
 
 Both bundles have the production package, non-debuggable manifest and exported
 TV entry. ARM64 native ELF and generated test APK ZIP alignment passed the 16 KB
@@ -153,8 +170,8 @@ checks. Estimated compressed downloads are 109 MB for ARM32 and 146 MB for ARM64
 actual Play delivery depends on the device. ARM64 hardware and 16 KB runtime
 coverage remain unverified.
 
-Both bundles and validation reports are attached to the existing GitHub draft
-`v0.1.0`, with remote checksums verified. The first
+Both final bundles, APKs, checksums, validation and runtime reports are attached
+to the public GitHub prerelease `v0.1.0`, with remote digests verified. The first
 [Play staging run](https://github.com/smolcars/rhenium/actions/runs/39082629444)
 uploaded and verified both bundles, then Google rejected the commit parameter
 `changesNotSentForReview=true` (HTTP 400). That option applies to rejected
@@ -164,7 +181,7 @@ The corrected helper commits the explicit internal `draft`, retains
 `ERROR_IF_IN_REVIEW`, then reads the release lifecycle and fails unless Google
 confirms `RELEASE_LIFECYCLE_STATE_DRAFT`. A regression exercises the actual stage
 flow, Google's exact parameter rejection, and rejection of an in-review result.
-The rerun and final Play-signed APK checks must pass before public release.
+The corrected staging and final Play-signed APK checks subsequently passed.
 See [commit parameters](https://developers.google.com/android-publisher/api-ref/rest/v3/edits/commit)
 and [release lifecycle states](https://developers.google.com/android-publisher/api-ref/rest/v3/applications.tracks.releases).
 
@@ -178,9 +195,9 @@ labels alongside the Android 17 classical/PQC signers. The verifier checks the
 API-pinned classical certificate and requires identical full signing identities
 across ARM32 and ARM64. Captured-response regressions cover both formats.
 
-## Current publication blocker
+## Installer-check issue and resolution
 
-The [Play download run](https://github.com/smolcars/rhenium/actions/runs/39083512879)
+The original [Play download run](https://github.com/smolcars/rhenium/actions/runs/39083512879)
 retrieved both universal APKs and passed signatures, package/version, TV launcher,
 native ABI and alignment checks. Local SDK 37/JDK 25 verification also passed.
 However, two physical TV launches of the ARM32 APK redirected to Google Play
@@ -212,16 +229,43 @@ still returned the protected APKs and correctly failed verification before
 attaching them to GitHub. Google's
 [installer-check guide](https://support.google.com/googleplay/android-developer/answer/15621622?hl=en)
 and [unprotected-distribution guidance](https://support.google.com/googleplay/android-developer/answer/10183279?hl=en-GB)
-describe these controls and fresh uploads with protection disabled. Prepare new
-`0.1.0` bundles using version codes `1003`/`1004`, reusing the existing build
-outputs. Preserve the original bundles and evidence separately. The staging
-configuration explicitly permits replacing only the previous `Rhenium 0.1.0`
-draft with codes `1001`/`1002`; unrelated drafts and non-draft releases remain
-protected. Once an unprotected single-file APK is available, validate both APKs,
-test the ARM32 APK on the TV, then publish the authorized GitHub prerelease and
-replace the README's pending download status. No full clean build is required.
+describe these controls and fresh uploads with protection disabled. New `0.1.0`
+bundles used codes `1003`/`1004`, preserving the original artifacts and reusing the
+build outputs. The staging configuration permits replacing only the previous
+`Rhenium 0.1.0` draft with codes `1001`/`1002`; unrelated drafts and non-draft
+releases remain protected.
 
-## Public-release gates
+The [fresh staging run](https://github.com/smolcars/rhenium/actions/runs/39085073303)
+confirmed `1003`/`1004` as `RELEASE_LIFECYCLE_STATE_DRAFT`. The
+[final download run](https://github.com/smolcars/rhenium/actions/runs/39085301033)
+passed both APKs, including installer-check exclusion and Google's classical and
+hybrid signing identities. Independent local SDK 37/JDK 25 checks passed too.
+
+The final Play-signed ARM32 APK passed TV launch, Home/search, network blocking,
+native per-site off/on, shipped cosmetic and scriptlet off/on, signed filter
+download/manual recheck, confirmed restart activation and post-restart blocking
+on the Android 14 Chromecast. The active snapshot reports publication on
+10 October 2026 and the latest published version after a manual recheck.
+A normal keep-data update initially failed for insufficient storage. Removing
+only the old app code with `pm uninstall -k` allowed installation; the browser's
+Android data-directory inode and all profile install states stayed unchanged.
+The TV was restored to normal browser Home, the automation session closed,
+and the owned fixture server and ADB mappings removed.
+
+The public release's `runtime-verification.json`, `verification.json`,
+`play-apks.json`, `SHA256SUMS` and `BUNDLE-SHA256SUMS` record the final artifacts
+and checks. APK hashes are:
+
+| APK | SHA-256 |
+| --- | --- |
+| ARM32 | `f07b4c0dde7d17b10001bf3d12de00ed076b2414bb640a51d5cbe6b4d2931a0a` |
+| ARM64 | `221ca0ce925787dc089028639c27217a1405685d4c383814d3a1ae19e7af6030` |
+
+The final project source is `400e45bc131e0a44625ba21102b5c3da0b63c575`, browser
+source `6292b815d455f5bcfcae7bd4e0da6cec67b56521`. Original full-build provenance,
+final build provenance, arguments, logs and mappings remain archived separately.
+
+## Remaining Play Store rollout gates
 
 Successful compilation is not a claim of Play approval. Before a public rollout,
 complete the privacy policy, Data safety and permission declarations, listing
