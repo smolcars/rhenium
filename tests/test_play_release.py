@@ -74,7 +74,8 @@ class PlayBundleValidationTests(unittest.TestCase):
         for manifest, xmltree in ((badging + "\napplication-debuggable", tree),
                                   (badging.replace("1002", "1001"), tree),
                                   (badging, tree.replace("=true", "=false")),
-                                  (badging, tree.replace("LEANBACK_LAUNCHER", "LAUNCHER"))):
+                                  (badging, tree.replace("LEANBACK_LAUNCHER", "LAUNCHER")),
+                                  (badging, tree + '\n  E: activity\n    A: android:name="com.pairip.licensecheck.LicenseActivity"')):
             with self.subTest(manifest=manifest), self.assertRaises(ValueError):
                 check_apk_manifest(manifest, xmltree, config, "arm64")
 

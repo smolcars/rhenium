@@ -151,6 +151,14 @@ async function download(api, config, directory) {
   const architectures = ['arm', 'arm64'];
   const metadata = [];
   for (const arch of architectures) metadata.push(await api.json(`${base}/${config.versionCodes[arch]}`));
+  console.log('Play APK availability: ' + JSON.stringify(metadata.map((response, index) => ({
+    arch: architectures[index], signingKeys: (response.generatedApks ?? []).map(group => ({
+      certificateSha256Hash: group.certificateSha256Hash,
+      universal: Boolean(group.generatedUniversalApk?.downloadId),
+      unprotectedSplitCount: group.unprotectedGeneratedSplitApks?.length ?? 0,
+      unprotectedStandaloneVariants: (group.unprotectedGeneratedStandaloneApks ?? []).map(apk => apk.variantId),
+    })),
+  }))));
   const groups = selectUniversalApks(metadata);
   const results = [];
   for (const [index, arch] of architectures.entries()) {

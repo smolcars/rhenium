@@ -38,6 +38,8 @@ def check_apk_manifest(badging: str, tree: str, config: dict[str, Any], arch: st
         raise ValueError("Downloaded APK manifest identity does not match the release")
     if "application-debuggable" in badging:
         raise ValueError("APK is debuggable")
+    if '"com.pairip.licensecheck.LicenseActivity"' in tree:
+        raise ValueError("Play installer-check protection blocks GitHub sideloads; obtain an unprotected Play-signed APK before publishing")
     lines = tree.splitlines()
     for index, line in enumerate(lines):
         if not line.lstrip().startswith("E: activity-alias "):
