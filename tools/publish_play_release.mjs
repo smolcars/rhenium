@@ -31,7 +31,15 @@ export function selectUniversalApks(metadata) {
     group => group.generatedUniversalApk?.downloadId && /^[0-9a-f]{64}$/i.test(group.certificateSha256Hash ?? '')));
   const common = [...new Set(choices[0]?.map(group => group.certificateSha256Hash.toLowerCase()) ?? [])].filter(
     fingerprint => choices.every(groups => groups.some(group => group.certificateSha256Hash.toLowerCase() === fingerprint)));
-  if (common.length !== 1) throw new Error('Play has not provided one unambiguous common signing key with universal APKs for both bundles.');
+  if (common.length !== 1) {
+    const availability = metadata.map(response => (response.generatedApks ?? []).map(group => ({
+      certificateSha256Hash: group.certificateSha256Hash,
+      universal: Boolean(group.generatedUniversalApk?.downloadId),
+      splitCount: group.generatedSplitApks?.length ?? 0,
+      standaloneCount: group.generatedStandaloneApks?.length ?? 0,
+    })));
+    throw new Error('Play has not provided one unambiguous common signing key with universal APKs for both bundles. Availability (ARM32, ARM64): ' + JSON.stringify(availability));
+  }
   return choices.map(groups => groups.find(group => group.certificateSha256Hash.toLowerCase() === common[0]));
 }
 
