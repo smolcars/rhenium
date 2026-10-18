@@ -4,9 +4,72 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { mergeDraft, selectUniversalApks, stage, preflight, prepareProductionDraft, prepareListing, prepareImages, prepareContact } from '../tools/publish_play_release.mjs';
+import { mergeDraft, selectUniversalApks, stage, preflight, submitClosed, prepareProductionDraft, prepareListing, prepareImages, prepareContact } from '../tools/publish_play_release.mjs';
 
 const config = { versionName: '0.1.0', versionCodes: { arm: 1001, arm64: 1002 } };
+
+test('closed submission verifies uploaded bytes, protects other tracks, and confirms actual review state', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'rhenium-closed-test-'));
+  const release = { ...config, packageName: 'com.nitesh.rhenium' };
+  const certificate = readFileSync(new URL('../release/upload-cert.sha256', import.meta.url), 'utf8').trim();
+  const bundles = ['arm', 'arm64'].map(arch => {
+    const sha256 = createHash('sha256').update(`Synthetic closed-test bundle ${arch}`).digest('hex');
+    writeFileSync(join(directory, `validation-${arch}.json`), JSON.stringify({
+      packageName: release.packageName, versionName: release.versionName, versionCode: config.versionCodes[arch],
+      uploadCertificateSha256: certificate, sha256, verifiedApks: ['synthetic-test.apk'],
+    }));
+    return { versionCode: config.versionCodes[arch], sha256 };
+  });
+  try {
+    for (const scenario of ['accepted', 'published', 'existing', 'not-sent', 'rejected', 'other-release', 'mismatch', 'missing-bundle', 'wrong-track']) {
+      let committed = false, discarded = false, updated = false;
+      const saved = { name: 'Rhenium 0.1.0', versionCodes: ['1001', '1002'], status: 'completed' };
+      const api = {
+        json: async (url, options = {}) => {
+          const path = new URL(url).pathname;
+          if (path.endsWith('/edits')) return { id: 'closed' };
+          if (path.endsWith('/tracks')) return { tracks: [
+            { track: 'production', releases: [{ name: 'Unrelated production' }] }, { track: 'beta' },
+            ...(scenario === 'wrong-track' ? [] : [{ track: 'alpha', releases: scenario === 'existing' ? [saved] :
+              scenario === 'other-release' ? [{ ...saved, versionCodes: ['900'] }] : [] }]),
+          ] };
+          if (path.endsWith('/bundles')) return { bundles: scenario === 'missing-bundle' ? bundles.slice(0, 1) :
+            scenario === 'mismatch' ? bundles.map(item => ({ ...item, sha256: '0'.repeat(64) })) : bundles };
+          if (path.endsWith('/testers/alpha')) { assert.equal(options.method, undefined); return { googleGroups: ['private-group@example.test'] }; }
+          if (path.endsWith('/tracks/alpha')) {
+            assert.equal(options.method, 'PUT');
+            const body = JSON.parse(options.body);
+            assert.equal(body.track, 'alpha');
+            assert.deepEqual(body.releases.map(({ releaseNotes, ...rest }) => rest), [saved]);
+            assert.equal(body.releases[0].releaseNotes[0].language, 'en-US');
+            updated = true;
+            if (scenario === 'rejected') throw new Error('Missing Play requirement.');
+            return {};
+          }
+          if (path.endsWith(':validate')) return {};
+          if (path.endsWith(':commit')) {
+            assert.equal(new URL(url).searchParams.get('changesInReviewBehavior'), 'ERROR_IF_IN_REVIEW');
+            assert.equal(new URL(url).searchParams.has('changesNotSentForReview'), false);
+            committed = true; return {};
+          }
+          if (path.endsWith('/tracks/alpha/releases')) return { releases: [{
+            activeArtifacts: [{ versionCode: 1001 }, { versionCode: 1002 }],
+            releaseLifecycleState: scenario === 'not-sent' ? 'RELEASE_LIFECYCLE_STATE_NOT_SENT_FOR_REVIEW' :
+              scenario === 'published' ? 'RELEASE_LIFECYCLE_STATE_PUBLISHED' : 'RELEASE_LIFECYCLE_STATE_IN_REVIEW',
+          }] };
+          assert.fail(`Unexpected closed-test request: ${url}`);
+        },
+        request: async (url, options) => { assert.equal(options.method, 'DELETE'); discarded = true; return { ok: true }; },
+      };
+      const operation = submitClosed(api, release, directory);
+      if (['accepted', 'published', 'existing'].includes(scenario)) await operation;
+      else await assert.rejects(operation, /not confirmed|Missing Play|refusing|does not match|No alpha/);
+      assert.equal(committed, ['accepted', 'published', 'not-sent'].includes(scenario));
+      assert.equal(discarded, !committed);
+      assert.equal(updated, ['accepted', 'published', 'not-sent', 'rejected'].includes(scenario));
+    }
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
 
 test('production drafting preserves other releases, discards rejected edits, and verifies draft lifecycle', async () => {
   for (const scenario of ['empty', 'existing', 'other-draft', 'live', 'rejected', 'in-review', 'missing-bundle']) {

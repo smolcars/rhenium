@@ -267,6 +267,21 @@ final build provenance, arguments, logs and mappings remain archived separately.
 
 ## Remaining Play Store rollout gates
 
+The owner has authorized submitting the existing 0.1.0 builds to closed testing.
+Run `play-release.yml` on `master` with `operation=closed`. It downloads the
+public release's validation reports, matches both uploaded bundle hashes and
+version codes, and submits only the existing `alpha` (or `tv:alpha`) track. It
+preserves existing tester settings and refuses to replace another release.
+The commit uses `ERROR_IF_IN_REVIEW` so an existing review is never canceled.
+The saved release lifecycle must confirm review, approval, or publication;
+`completed` in a track response alone does not establish review submission.
+This operation never updates production or open testing, uploads new bundles,
+accepts legal agreements, or changes the GitHub release.
+The tester API exposes Google Groups but not individual email lists; a zero group
+count does not prove that no email-list testers are configured. Closed testing
+still requires actual tester opt-in and use; submission does not start the
+14-day period by itself.
+
 Run `play-release.yml` with `operation=preflight` to test the already uploaded
 bundle codes as a production candidate inside a temporary Play edit. It reports
 store-listing field presence, calls Google's validation endpoint, and always

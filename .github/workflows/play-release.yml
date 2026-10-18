@@ -4,12 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Prepare listing text/images, stage a draft, retrieve APKs, or check readiness
+        description: Submit a closed test, prepare listing/drafts, retrieve APKs, or check readiness
         type: choice
         required: true
         default: stage
         options:
           - stage
+          - closed
           - download
           - preflight
           - production-draft
@@ -62,6 +63,18 @@ jobs:
         env:
           GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
         run: node tools/publish_play_release.mjs stage candidate
+      - name: Download validation for the existing closed-test bundles
+        if: inputs.operation == 'closed'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir candidate \
+            --pattern 'validation-*.json'
+      - name: Submit the existing bundles to closed testing
+        if: inputs.operation == 'closed'
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: node tools/publish_play_release.mjs closed candidate
       - name: Validate production in a temporary edit without publishing
         if: inputs.operation == 'preflight'
         env:

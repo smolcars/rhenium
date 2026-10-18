@@ -1,4 +1,4 @@
-// Stage internal drafts, retrieve signed APKs, or validate without publishing.
+// Submit closed tests, stage drafts, retrieve signed APKs, or validate releases.
 import { createHash } from 'node:crypto';
 import { createReadStream, createWriteStream, readFileSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -191,6 +191,77 @@ export async function preflight(api, config) {
   }
 }
 
+export async function submitClosed(api, config, directory) {
+  const certificate = readFileSync(new URL('../release/upload-cert.sha256', import.meta.url), 'utf8').trim();
+  const reports = ['arm', 'arm64'].map(arch => {
+    const report = JSON.parse(readFileSync(resolve(directory, `validation-${arch}.json`), 'utf8'));
+    if (report.packageName !== config.packageName || report.versionName !== config.versionName ||
+        report.versionCode !== config.versionCodes[arch] || report.uploadCertificateSha256 !== certificate ||
+        !/^[0-9a-f]{64}$/.test(report.sha256 ?? '') || !report.verifiedApks?.length) {
+      throw new Error(`Invalid candidate validation report: ${arch}`);
+    }
+    return report;
+  });
+  const app = encodeURIComponent(config.packageName);
+  const base = `${API}${app}/edits`;
+  const edit = await api.json(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  if (!edit.id) throw new Error('Play returned no edit ID.');
+  const editUrl = `${base}/${encodeURIComponent(edit.id)}`;
+  let committed = false;
+  try {
+    const tracks = (await api.json(`${editUrl}/tracks`)).tracks ?? [];
+    // alpha is the existing closed track; beta is open testing and is excluded.
+    const track = ['tv:alpha', 'alpha'].map(name => tracks.find(item => item.track === name)).find(Boolean);
+    if (!track) throw new Error('No alpha closed-testing track exists; configure the closed test in Play Console first.');
+    const codes = reports.map(report => String(report.versionCode)).sort();
+    const current = track.releases ?? [];
+    const matches = release => release.name === `Rhenium ${config.versionName}` &&
+      ['draft', 'completed'].includes(release.status) &&
+      JSON.stringify([...(release.versionCodes ?? [])].sort()) === JSON.stringify(codes);
+    if (current.length && (current.length !== 1 || !matches(current[0]))) {
+      throw new Error('The closed track already has another release; refusing to overwrite it.');
+    }
+    const bundles = (await api.json(`${editUrl}/bundles`)).bundles ?? [];
+    for (const report of reports) {
+      const bundle = bundles.find(item => String(item.versionCode) === String(report.versionCode));
+      if (!bundle || bundle.sha256 !== report.sha256) throw new Error(`Uploaded bundle does not match validation: ${report.versionCode}`);
+    }
+    const testers = await api.json(`${editUrl}/testers/${encodeURIComponent(track.track)}`);
+    console.log(JSON.stringify({ track: track.track, configuredGoogleGroupCount: testers.googleGroups?.length ?? 0,
+      emailListVisibility: 'Individual email lists are not exposed by the Play API; existing tester settings are preserved.' }, null, 2));
+    if (current[0]?.status !== 'completed') {
+      console.log('Assigning the verified bundles to the closed-testing track.');
+      await api.json(`${editUrl}/tracks/${encodeURIComponent(track.track)}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ track: track.track,
+          releases: [{ name: `Rhenium ${config.versionName}`, versionCodes: codes, status: 'completed',
+            releaseNotes: [{ language: 'en-US', text: 'Initial Rhenium release for Android TV: remote-friendly browsing, ad blocking, private browsing, and phone remote controls.' }] }],
+        }),
+      });
+      console.log('Closed track assignment accepted; validating the release.');
+      await api.json(`${editUrl}:validate`, { method: 'POST' });
+      console.log('Validation passed; submitting the closed release.');
+      await api.json(`${editUrl}:commit?changesInReviewBehavior=ERROR_IF_IN_REVIEW`, { method: 'POST' });
+      committed = true;
+    }
+    const saved = await api.json(`${API}${app}/tracks/${encodeURIComponent(track.track)}/releases`);
+    const matching = (saved.releases ?? []).filter(release =>
+      JSON.stringify((release.activeArtifacts ?? []).map(item => String(item.versionCode)).sort()) === JSON.stringify(codes));
+    if (matching.length !== 1) throw new Error('Google did not confirm one matching closed release; inspect Play Console before retrying.');
+    const state = matching[0].releaseLifecycleState;
+    console.log(JSON.stringify({ packageName: config.packageName, track: track.track, versionCodes: codes,
+      releaseLifecycleState: state }, null, 2));
+    if (!['RELEASE_LIFECYCLE_STATE_IN_REVIEW', 'RELEASE_LIFECYCLE_STATE_APPROVED_NOT_PUBLISHED', 'RELEASE_LIFECYCLE_STATE_PUBLISHED'].includes(state)) {
+      throw new Error(`Closed release is saved but submission is not confirmed (${state}); inspect Publishing overview in Play Console.`);
+    }
+    console.log('Closed release submission confirmed. No production or open-testing track was changed.');
+  } finally {
+    if (!committed) {
+      const discarded = await api.request(editUrl, { method: 'DELETE' });
+      if (!discarded.ok && discarded.status !== 404) throw new Error(`Closed-testing edit cleanup failed (HTTP ${discarded.status}).`);
+    }
+  }
+}
+
 export async function prepareProductionDraft(api, config) {
   const app = encodeURIComponent(config.packageName);
   const base = `${API}${app}/edits`;
@@ -369,8 +440,8 @@ async function download(api, config, directory) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const [operation, directory] = process.argv.slice(2);
-    if (!['stage', 'download', 'preflight', 'production-draft', 'listing', 'images', 'contact'].includes(operation) || (['stage', 'download'].includes(operation) && !directory)) {
-      throw new Error('Usage: publish_play_release.mjs stage|download DIRECTORY, preflight, production-draft, listing, images, or contact');
+    if (!['stage', 'closed', 'download', 'preflight', 'production-draft', 'listing', 'images', 'contact'].includes(operation) || (['stage', 'closed', 'download'].includes(operation) && !directory)) {
+      throw new Error('Usage: publish_play_release.mjs stage|closed|download DIRECTORY, preflight, production-draft, listing, images, or contact');
     }
     let credentials;
     try { credentials = JSON.parse(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON ?? '{}'); }
@@ -378,7 +449,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     delete process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
     const config = JSON.parse(readFileSync(new URL('../release/android.json', import.meta.url), 'utf8'));
     const api = client(await authenticate(credentials));
-    const run = { stage, download, preflight, 'production-draft': prepareProductionDraft, listing: prepareListing, images: prepareImages,
+    const run = { stage, closed: submitClosed, download, preflight, 'production-draft': prepareProductionDraft, listing: prepareListing, images: prepareImages,
       contact: (api, config) => prepareContact(api, config, process.env.RHENIUM_PLAY_CONTACT_EMAIL) }[operation];
     await run(api, config, directory);
   } catch (error) {
