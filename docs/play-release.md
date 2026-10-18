@@ -295,6 +295,15 @@ Production assignment still returns Google's generic HTTP 400 precondition error
 the already uploaded bundles. It refuses to replace another production release,
 uses only `draft` status, and verifies the saved draft lifecycle after committing.
 It cannot submit for review, publish, or accept legal agreements.
+The [production-draft attempt](https://github.com/smolcars/rhenium/actions/runs/39087151404)
+also returned `HTTP 400: Precondition check failed`; it did not save a production
+draft. The [post-contact preflight](https://github.com/smolcars/rhenium/actions/runs/39087079919)
+confirms the saved descriptions, all five images, and both contact fields.
+The existing internal draft remains intact. The API does not identify the missing
+prerequisite, so the owner must inspect the app Dashboard or the Production
+release screen for its actual blocker. Do not infer an incomplete declaration,
+testing requirement, or account type from this generic error. Google documents
+initial publication and legal consents as [Console steps](https://developers.google.com/android-publisher/edits).
 API access checks share the publishing concurrency group so
 simultaneous checks cannot invalidate publishing edits.
 
