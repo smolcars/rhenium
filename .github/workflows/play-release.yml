@@ -14,6 +14,11 @@ on:
           - preflight
           - listing
           - images
+          - contact
+      support_email:
+        description: Public support email, required only for the contact operation
+        type: string
+        required: false
 
 permissions:
   contents: write
@@ -71,6 +76,12 @@ jobs:
         env:
           GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
         run: node tools/publish_play_release.mjs images
+      - name: Save owner-approved public support contact without changing release tracks
+        if: inputs.operation == 'contact'
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          RHENIUM_PLAY_CONTACT_EMAIL: ${{ inputs.support_email }}
+        run: node tools/publish_play_release.mjs contact
       - name: Retrieve Play-signed APKs
         if: inputs.operation == 'download'
         env:

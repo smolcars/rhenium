@@ -4,9 +4,34 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { mergeDraft, selectUniversalApks, stage, preflight, prepareListing, prepareImages } from '../tools/publish_play_release.mjs';
+import { mergeDraft, selectUniversalApks, stage, preflight, prepareListing, prepareImages, prepareContact } from '../tools/publish_play_release.mjs';
 
 const config = { versionName: '0.1.0', versionCodes: { arm: 1001, arm64: 1002 } };
+
+test('contact preparation requires the owner email and preserves existing contact details', async () => {
+  await assert.rejects(prepareContact({}, config, ''), /owner-approved/);
+  for (const present of [false, true]) {
+    let committed = false, discarded = false;
+    const api = {
+      json: async (url, options = {}) => {
+        const path = new URL(url).pathname;
+        assert.ok(!path.includes('/tracks'));
+        if (path.endsWith('/edits')) return { id: 'contact' };
+        if (path.endsWith('/details') && options.method === 'PATCH') {
+          assert.deepEqual(JSON.parse(options.body), { contactEmail: 'support@example.test', contactWebsite: 'https://github.com/smolcars/rhenium' });
+          return {};
+        }
+        if (path.endsWith('/details')) return present ? { contactEmail: 'existing@example.test', contactWebsite: 'https://example.test' } : {};
+        if (path.endsWith(':validate')) return {};
+        if (path.endsWith(':commit')) { committed = true; return {}; }
+        assert.fail(url);
+      },
+      request: async (url, options) => { assert.equal(options.method, 'DELETE'); discarded = true; return { ok: true }; },
+    };
+    await prepareContact(api, { packageName: 'com.nitesh.rhenium' }, 'support@example.test');
+    assert.equal(committed, !present); assert.equal(discarded, present);
+  }
+});
 
 test('production preflight validates only a temporary edit and discards it even on rejection', async () => {
   for (const rejected of [false, true]) {

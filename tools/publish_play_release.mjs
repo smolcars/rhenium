@@ -258,6 +258,34 @@ export async function prepareImages(api, config) {
   }
 }
 
+export async function prepareContact(api, config, email) {
+  if (typeof email !== 'string' || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('Provide the owner-approved public support email.');
+  }
+  const base = `${API}${encodeURIComponent(config.packageName)}/edits`;
+  const edit = await api.json(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  if (!edit.id) throw new Error('Play returned no edit ID.');
+  const editUrl = `${base}/${encodeURIComponent(edit.id)}`;
+  let committed = false;
+  try {
+    const current = await api.json(`${editUrl}/details`);
+    const missing = {};
+    if (!current.contactEmail) missing.contactEmail = email;
+    if (!current.contactWebsite) missing.contactWebsite = 'https://github.com/smolcars/rhenium';
+    if (!Object.keys(missing).length) { console.log('Contact details already exist; preserved without changes.'); return; }
+    await api.json(`${editUrl}/details`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(missing) });
+    await api.json(`${editUrl}:validate`, { method: 'POST' });
+    await api.json(`${editUrl}:commit?changesInReviewBehavior=ERROR_IF_IN_REVIEW`, { method: 'POST' });
+    committed = true;
+    console.log('Saved missing contact details; no release tracks changed.');
+  } finally {
+    if (!committed) {
+      const discarded = await api.request(editUrl, { method: 'DELETE' });
+      if (!discarded.ok && discarded.status !== 404) throw new Error(`Contact edit cleanup failed (HTTP ${discarded.status}).`);
+    }
+  }
+}
+
 async function download(api, config, directory) {
   mkdirSync(directory, { recursive: true });
   const base = `${API}${encodeURIComponent(config.packageName)}/generatedApks`;
@@ -294,8 +322,8 @@ async function download(api, config, directory) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const [operation, directory] = process.argv.slice(2);
-    if (!['stage', 'download', 'preflight', 'listing', 'images'].includes(operation) || (['stage', 'download'].includes(operation) && !directory)) {
-      throw new Error('Usage: publish_play_release.mjs stage|download DIRECTORY, preflight, listing, or images');
+    if (!['stage', 'download', 'preflight', 'listing', 'images', 'contact'].includes(operation) || (['stage', 'download'].includes(operation) && !directory)) {
+      throw new Error('Usage: publish_play_release.mjs stage|download DIRECTORY, preflight, listing, images, or contact');
     }
     let credentials;
     try { credentials = JSON.parse(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON ?? '{}'); }
@@ -303,7 +331,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     delete process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
     const config = JSON.parse(readFileSync(new URL('../release/android.json', import.meta.url), 'utf8'));
     const api = client(await authenticate(credentials));
-    await ({ stage, download, preflight, listing: prepareListing, images: prepareImages }[operation])(api, config, directory);
+    const run = { stage, download, preflight, listing: prepareListing, images: prepareImages,
+      contact: (api, config) => prepareContact(api, config, process.env.RHENIUM_PLAY_CONTACT_EMAIL) }[operation];
+    await run(api, config, directory);
   } catch (error) {
     console.error(error instanceof Error ? error.message : 'Play operation failed.');
     process.exitCode = 1;

@@ -283,6 +283,13 @@ feature graphic, TV banner and TV screenshot counts.
 `operation=images` uploads the approved exports and real TV captures in
 [`release/play-listing`](../release/play-listing/README.md) only to empty image
 groups, preserving existing images and release tracks.
+The text update and all five image uploads have succeeded through the API.
+The subsequent check confirmed both descriptions plus one icon, one feature
+graphic, one TV banner and two TV screenshots. It also found missing support
+contact details. `operation=contact`, with the owner's public `support_email`
+workflow input, fills only missing email/website fields and does not change
+release tracks. API access checks share the publishing concurrency group so
+simultaneous checks cannot invalidate publishing edits.
 
 Successful compilation is not a claim of Play approval. Before a public rollout,
 complete the privacy policy, Data safety and permission declarations, listing
