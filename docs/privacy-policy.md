@@ -83,6 +83,17 @@ permission prompts, where supported. Information you choose to provide to a
 website is handled by that website. You can manage app permissions in Android
 settings.
 
+The browser can query installed apps to find an app that can handle a website
+link or a file you choose to open. This matching happens on your device; the
+project does not collect or upload your installed-app inventory. If you download
+an APK and choose to open it, Android controls installation and any permission
+to install apps from this source. Rhenium does not silently install apps.
+
+Foreground services can keep user-requested downloads, media playback or a
+website's permitted microphone session running while you use another app.
+Android notifications and permissions govern these activities. Microphone
+content you authorize a website to use is handled by that website.
+
 ## Support and information you send us
 
 If you email support or report an issue, we receive the contact information,
