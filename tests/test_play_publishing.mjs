@@ -21,8 +21,9 @@ test('closed submission verifies uploaded bytes, protects other tracks, and conf
     return { versionCode: config.versionCodes[arch], sha256 };
   });
   try {
-    for (const scenario of ['accepted', 'published', 'existing', 'not-sent', 'rejected', 'other-release', 'mismatch', 'missing-bundle', 'wrong-track']) {
-      let committed = false, discarded = false, updated = false;
+    for (const scenario of ['accepted', 'published', 'existing', 'not-sent', 'draft-app', 'rejected', 'other-release', 'mismatch', 'missing-bundle', 'wrong-track']) {
+      let committed = false, discarded = false, updated = false, savedAsDraft = false;
+      const statuses = [];
       const saved = { name: 'Rhenium 0.1.0', versionCodes: ['1001', '1002'], status: 'completed' };
       const api = {
         json: async (url, options = {}) => {
@@ -40,13 +41,20 @@ test('closed submission verifies uploaded bytes, protects other tracks, and conf
             assert.equal(options.method, 'PUT');
             const body = JSON.parse(options.body);
             assert.equal(body.track, 'alpha');
-            assert.deepEqual(body.releases.map(({ releaseNotes, ...rest }) => rest), [saved]);
+            assert.deepEqual(body.releases.map(({ releaseNotes, ...rest }) => rest), [{ ...saved, status: savedAsDraft ? 'draft' : 'completed' }]);
+            statuses.push(body.releases[0].status);
             assert.equal(body.releases[0].releaseNotes[0].language, 'en-US');
             updated = true;
             if (scenario === 'rejected') throw new Error('Missing Play requirement.');
             return {};
           }
-          if (path.endsWith(':validate')) return {};
+          if (path.endsWith(':validate')) {
+            if (scenario === 'draft-app' && !savedAsDraft) {
+              savedAsDraft = true;
+              throw new Error('Play request failed (HTTP 400): Only releases with status draft may be created on draft app.');
+            }
+            return {};
+          }
           if (path.endsWith(':commit')) {
             assert.equal(new URL(url).searchParams.get('changesInReviewBehavior'), 'ERROR_IF_IN_REVIEW');
             assert.equal(new URL(url).searchParams.has('changesNotSentForReview'), false);
@@ -54,7 +62,8 @@ test('closed submission verifies uploaded bytes, protects other tracks, and conf
           }
           if (path.endsWith('/tracks/alpha/releases')) return { releases: [{
             activeArtifacts: [{ versionCode: 1001 }, { versionCode: 1002 }],
-            releaseLifecycleState: scenario === 'not-sent' ? 'RELEASE_LIFECYCLE_STATE_NOT_SENT_FOR_REVIEW' :
+            releaseLifecycleState: scenario === 'draft-app' ? 'RELEASE_LIFECYCLE_STATE_DRAFT' :
+              scenario === 'not-sent' ? 'RELEASE_LIFECYCLE_STATE_NOT_SENT_FOR_REVIEW' :
               scenario === 'published' ? 'RELEASE_LIFECYCLE_STATE_PUBLISHED' : 'RELEASE_LIFECYCLE_STATE_IN_REVIEW',
           }] };
           assert.fail(`Unexpected closed-test request: ${url}`);
@@ -63,10 +72,11 @@ test('closed submission verifies uploaded bytes, protects other tracks, and conf
       };
       const operation = submitClosed(api, release, directory);
       if (['accepted', 'published', 'existing'].includes(scenario)) await operation;
-      else await assert.rejects(operation, /not confirmed|Missing Play|refusing|does not match|No alpha/);
-      assert.equal(committed, ['accepted', 'published', 'not-sent'].includes(scenario));
+      else await assert.rejects(operation, /not confirmed|first submission|Missing Play|refusing|does not match|No alpha/);
+      assert.equal(committed, ['accepted', 'published', 'not-sent', 'draft-app'].includes(scenario));
       assert.equal(discarded, !committed);
-      assert.equal(updated, ['accepted', 'published', 'not-sent', 'rejected'].includes(scenario));
+      assert.equal(updated, ['accepted', 'published', 'not-sent', 'draft-app', 'rejected'].includes(scenario));
+      if (scenario === 'draft-app') assert.deepEqual(statuses, ['completed', 'draft']);
     }
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

@@ -275,6 +275,12 @@ preserves existing tester settings and refuses to replace another release.
 The commit uses `ERROR_IF_IN_REVIEW` so an existing review is never canceled.
 The saved release lifecycle must confirm review, approval, or publication;
 `completed` in a track response alone does not establish review submission.
+The first closed submission reached validation but Google returned
+`Only releases with status draft may be created on draft app.` For that exact
+response, the helper saves the same verified bundles as a closed-testing draft,
+then reports the required first submission in Play Console as an unfinished
+action. It never reports a saved draft as a submitted release. Other validation
+errors still fail and discard the edit without committing anything.
 This operation never updates production or open testing, uploads new bundles,
 accepts legal agreements, or changes the GitHub release.
 The tester API exposes Google Groups but not individual email lists; a zero group

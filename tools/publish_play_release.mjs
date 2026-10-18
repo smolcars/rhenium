@@ -231,15 +231,25 @@ export async function submitClosed(api, config, directory) {
       emailListVisibility: 'Individual email lists are not exposed by the Play API; existing tester settings are preserved.' }, null, 2));
     if (current[0]?.status !== 'completed') {
       console.log('Assigning the verified bundles to the closed-testing track.');
-      await api.json(`${editUrl}/tracks/${encodeURIComponent(track.track)}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ track: track.track,
-          releases: [{ name: `Rhenium ${config.versionName}`, versionCodes: codes, status: 'completed',
-            releaseNotes: [{ language: 'en-US', text: 'Initial Rhenium release for Android TV: remote-friendly browsing, ad blocking, private browsing, and phone remote controls.' }] }],
-        }),
+      const desired = { track: track.track,
+        releases: [{ name: `Rhenium ${config.versionName}`, versionCodes: codes, status: 'completed',
+          releaseNotes: [{ language: 'en-US', text: 'Initial Rhenium release for Android TV: remote-friendly browsing, ad blocking, private browsing, and phone remote controls.' }] }],
+      };
+      const update = () => api.json(`${editUrl}/tracks/${encodeURIComponent(track.track)}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(desired),
       });
+      await update();
       console.log('Closed track assignment accepted; validating the release.');
-      await api.json(`${editUrl}:validate`, { method: 'POST' });
-      console.log('Validation passed; submitting the closed release.');
+      try {
+        await api.json(`${editUrl}:validate`, { method: 'POST' });
+      } catch (error) {
+        if (!(error instanceof Error) || !error.message.endsWith('Only releases with status draft may be created on draft app.')) throw error;
+        console.log('Google requires the first submission in Play Console; preparing an unsubmitted closed-testing draft.');
+        desired.releases[0].status = 'draft';
+        await update();
+        await api.json(`${editUrl}:validate`, { method: 'POST' });
+      }
+      console.log(`Validation passed; committing the closed release with status ${desired.releases[0].status}.`);
       await api.json(`${editUrl}:commit?changesInReviewBehavior=ERROR_IF_IN_REVIEW`, { method: 'POST' });
       committed = true;
     }
@@ -250,6 +260,9 @@ export async function submitClosed(api, config, directory) {
     const state = matching[0].releaseLifecycleState;
     console.log(JSON.stringify({ packageName: config.packageName, track: track.track, versionCodes: codes,
       releaseLifecycleState: state }, null, 2));
+    if (state === 'RELEASE_LIFECYCLE_STATE_DRAFT') {
+      throw new Error('Closed-testing draft is ready; complete the first submission in Play Console. It has not been submitted for review.');
+    }
     if (!['RELEASE_LIFECYCLE_STATE_IN_REVIEW', 'RELEASE_LIFECYCLE_STATE_APPROVED_NOT_PUBLISHED', 'RELEASE_LIFECYCLE_STATE_PUBLISHED'].includes(state)) {
       throw new Error(`Closed release is saved but submission is not confirmed (${state}); inspect Publishing overview in Play Console.`);
     }
