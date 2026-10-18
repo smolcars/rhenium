@@ -60,7 +60,12 @@ jobs:
         run: node tools/publish_play_release.mjs download play-apks
       - name: Verify downloaded APKs
         if: inputs.operation == 'download'
-        run: python3 tools/verify_play_apks.py "$ANDROID_HOME" play-apks
+        run: |
+          # Android 17 hybrid signatures require the ML-DSA provider in modern Java.
+          export JAVA_HOME="${JAVA_HOME_25_X64:?The runner must provide JDK 25}"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          java -version
+          python3 tools/verify_play_apks.py "$ANDROID_HOME" play-apks
       - name: Attach signed APKs to the GitHub draft release
         if: inputs.operation == 'download'
         env:
