@@ -92,3 +92,14 @@ test('GitHub APKs require an unambiguous common Play signing identity', () => {
   assert.throws(() => selectUniversalApks([{ generatedApks: ambiguous }, { generatedApks: ambiguous }]), /unambiguous/);
   assert.throws(() => selectUniversalApks([{ generatedApks: [{ certificateSha256Hash: 'a'.repeat(64) }] }, { generatedApks: [second] }]), /unambiguous/);
 });
+
+test('Google colon-separated SHA256 certificates normalize to the APK verifier format', () => {
+  const certificate = 'E1:F1:15:3D:F5:39:03:26:FF:76:6F:1F:CC:D1:76:FF:7E:5D:1D:50:74:17:6F:CB:1B:CA:B9:99:9C:09:03:4B';
+  const hex = certificate.replaceAll(':', '').toLowerCase();
+  const group = value => ({ certificateSha256Hash: value, generatedUniversalApk: { downloadId: 'synthetic-test' } });
+  const selected = selectUniversalApks([{ generatedApks: [group(certificate)] }, { generatedApks: [group(hex)] }]);
+  assert.deepEqual(selected.map(item => item.certificateSha256Hash), [hex, hex]);
+  for (const invalid of [certificate + ':', ':' + certificate, certificate.replace(':', ''), 'not-a-certificate']) {
+    assert.throws(() => selectUniversalApks([{ generatedApks: [group(invalid)] }, { generatedApks: [group(hex)] }]), /unambiguous/);
+  }
+});

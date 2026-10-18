@@ -27,8 +27,10 @@ export function mergeDraft(track, config) {
 }
 
 export function selectUniversalApks(metadata) {
-  const choices = metadata.map(response => (response.generatedApks ?? []).filter(
-    group => group.generatedUniversalApk?.downloadId && /^[0-9a-f]{64}$/i.test(group.certificateSha256Hash ?? '')));
+  const choices = metadata.map(response => (response.generatedApks ?? []).filter(group =>
+    group.generatedUniversalApk?.downloadId && typeof group.certificateSha256Hash === 'string' &&
+    /^(?:[0-9a-f]{64}|(?:[0-9a-f]{2}:){31}[0-9a-f]{2})$/i.test(group.certificateSha256Hash))
+    .map(group => ({ ...group, certificateSha256Hash: group.certificateSha256Hash.replaceAll(':', '').toLowerCase() })));
   const common = [...new Set(choices[0]?.map(group => group.certificateSha256Hash.toLowerCase()) ?? [])].filter(
     fingerprint => choices.every(groups => groups.some(group => group.certificateSha256Hash.toLowerCase() === fingerprint)));
   if (common.length !== 1) {
