@@ -155,6 +155,9 @@ device tests verify the actual browser.
 
 ## Contributing
 
+Read the [Rhenium Privacy Policy](docs/privacy-policy.md) for browser data,
+network requests, phone controls and privacy contact details.
+
 [Report a bug or suggest a feature](https://github.com/smolcars/rhenium/issues).
 For bugs, include the TV model, Android version, browser source/build revision,
 website and steps to reproduce. Screenshots or a short recording help with
